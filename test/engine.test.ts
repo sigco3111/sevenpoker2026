@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Card, evaluate5, evaluate7, evaluate7Best, compareHandValue, compareUpcards, CATEGORY_NAME } from '../src/engine/cards';
-import { createGame, chooseReveal, applyAction, startHand, legalActions, progressSnapshot, canSaveProgress, ANTE } from '../src/engine/game';
+import { createGame, chooseReveal, applyAction, startHand, legalActions, progressSnapshot, canSaveProgress, ANTE, BET_UNITS } from '../src/engine/game';
 import { aiChooseReveal, aiTurn, aiLine } from '../src/engine/ai';
 
 const c = (rank: number, suit: Card['suit']): Card => ({ rank, suit });
@@ -140,6 +140,45 @@ describe('게임 진행', () => {
     const third = g.turn;
     applyAction(g, third, 'call'); // 레이즈 불가 상태에서 콜
     expect(g.raisesUsed).toBe(2);
+  });
+
+  it('레이즈 버튼 표기액(도달 베팅액)과 실제 차감액은 항상 일치한다', () => {
+    // UI는 `currentBet + unit`(레이즈 후 도달 베팅액)을 버튼에 표시하고, 엔진은 `toCall + unit`을 차감한다.
+    // 둘의 차이는 내 스트리트 베팅액 s.bet인데, 스트리트당 레이즈 2회 제한 아래에서는
+    // 레이즈가 가능한 상태에 도달하려면 내가 그 스트리트에 아직 건 칩이 없어야 하므로(s.bet === 0)
+    // 표기액과 차감액이 항상 같아야 한다. 이 불변을 잠가 버튼 표기와 실제 차감의 어긋남을 방지한다.
+    const lcg = (seed: number) => () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+    const rng = lcg(20261112);
+    let raiseStates = 0;
+    for (let h = 0; h < 800; h++) {
+      const g = createGame(rng);
+      let guard = 0;
+      while (g.phase !== 'hand-over' && guard++ < 2000) {
+        if (g.phase === 'choose-reveal') {
+          for (let i = 0; i < 4; i++) if (!g.revealPicked[i]) chooseReveal(g, i, aiChooseReveal(g, i));
+        } else if (g.phase === 'betting') {
+          const seat = g.turn;
+          if (legalActions(g, seat).includes('raise')) {
+            raiseStates += 1;
+            const s = g.seats[seat];
+            const unit = BET_UNITS[g.street];
+            expect(s.bet).toBe(0); // 표기액 == 차감액이 성립하는 불변 조건
+            expect(s.chips).toBeGreaterThanOrEqual(g.currentBet - s.bet + unit); // 숏스택 부분 차감 없음
+          }
+          const { action } = aiTurn(g, seat, rng);
+          if (action === 'raise') {
+            const expected = g.currentBet + BET_UNITS[g.street]; // 버튼에 표시되는 금액
+            const before = g.seats[seat].chips;
+            applyAction(g, seat, action, rng);
+            expect(before - g.seats[seat].chips).toBe(expected); // 실제 차감 == 표기액
+            expect(g.currentBet).toBe(expected); // 로그 '레이즈 N칩'도 같은 값
+            continue;
+          }
+          applyAction(g, seat, action, rng);
+        } else break;
+      }
+    }
+    expect(raiseStates).toBeGreaterThan(200); // 표본 충분성
   });
 });
 
