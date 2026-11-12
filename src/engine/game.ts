@@ -24,7 +24,30 @@ export interface Seat {
   bet: number; // 이번 스트리트 베팅액
   committed: number; // 이번 판 총 투입
   refilled: boolean; // 이번 판 시작 시 리필 여부
+  personality?: string; // AI 성향 키(tight/balanced/loose). 없으면 ai.ts의 자리별 기본값
+  avatar?: string; // 아바타 이미지 경로. 없으면 table.ts의 자리별 기본값
 }
+
+// 대국 상대 구성(스토리·토너먼트에서 다른 캐릭터 조합으로 테이블을 열 때 사용)
+export interface OpponentSpec {
+  name: string;
+  personality: 'tight' | 'balanced' | 'loose';
+  avatar: string;
+}
+
+export interface CreateGameOptions {
+  opponents?: OpponentSpec[]; // 정확히 3명. 생략하면 자유대국 기본 3인
+  startChips?: number; // 생략하면 START_CHIPS
+  ante?: number; // 생략하면 ANTE
+  betUnits?: number[]; // 4개. 생략하면 BET_UNITS
+}
+
+// 자유대국 기본 상대 — 캐릭터 설정은 제안 기본값(사용자 미확정)
+export const DEFAULT_OPPONENTS: OpponentSpec[] = [
+  { name: '소연 · 연륜', personality: 'tight', avatar: 'avatars/avatar-1.png' },
+  { name: '선우 · 관찰', personality: 'balanced', avatar: 'avatars/avatar-2.png' },
+  { name: '록키 · 직관', personality: 'loose', avatar: 'avatars/avatar-3.png' },
+];
 
 export interface LogEntry {
   text: string;
@@ -33,6 +56,8 @@ export interface LogEntry {
 export interface GameState {
   seats: Seat[];
   dealer: number;
+  ante: number; // 이 테이블의 앤티(제안 기본값 ANTE가 기본)
+  betUnits: number[]; // 스트리트별 베팅 단위(제안 기본값 BET_UNITS가 기본)
   phase: Phase;
   street: number; // 0..3
   pot: number;
@@ -59,22 +84,28 @@ export interface SavedProgress {
 }
 
 // saved를 주면 시작 전에 칩·판 번호를 복원한다. 앤티/리필 판정은 복원된 값 기준.
-export function createGame(rng: () => number = Math.random, saved?: SavedProgress): GameState {
+export function createGame(rng: () => number = Math.random, saved?: SavedProgress, opts?: CreateGameOptions): GameState {
   const chipsOk =
     saved && Array.isArray(saved.chips) && saved.chips.length === 4 && saved.chips.every((n) => Number.isFinite(n) && n >= 0);
-  const seats: Seat[] = ['나', 'AI 1 · 연륜', 'AI 2 · 관찰', 'AI 3 · 직관'].map((name, i) => ({
+  const opponents = opts?.opponents ?? DEFAULT_OPPONENTS;
+  const base = opts?.startChips ?? START_CHIPS;
+  const seats: Seat[] = ['나', ...opponents.map((o) => o.name)].map((name, i) => ({
     name,
-    chips: chipsOk ? Math.floor(saved!.chips![i]) : START_CHIPS,
+    chips: chipsOk ? Math.floor(saved!.chips![i]) : base,
     cards: [],
     revealed: [],
     folded: false,
     bet: 0,
     committed: 0,
     refilled: false,
+    personality: i === 0 ? undefined : opponents[i - 1].personality,
+    avatar: i === 0 ? undefined : opponents[i - 1].avatar,
   }));
   const state: GameState = {
     seats,
     dealer: 0,
+    ante: opts?.ante ?? ANTE,
+    betUnits: opts?.betUnits && opts.betUnits.length === 4 ? opts.betUnits.slice() : BET_UNITS.slice(),
     phase: 'choose-reveal',
     street: 0,
     pot: 0,
@@ -135,7 +166,7 @@ export function startHand(state: GameState, rng: () => number = Math.random) {
   state.revealPicked = [false, false, false, false];
   for (const s of state.seats) {
     // 파산 시 기본 칩 재지급(확정). 수치는 제안 기본값.
-    if (s.chips < ANTE) {
+    if (s.chips < state.ante) {
       s.chips = REFILL_CHIPS;
       s.refilled = true;
     } else {
@@ -154,10 +185,10 @@ export function startHand(state: GameState, rng: () => number = Math.random) {
   state.showdownRevealed = false;
   say(state, `— ${state.handNumber}번째 판 —`);
   for (let i = 0; i < state.seats.length; i++) {
-    pay(state, i, ANTE);
+    pay(state, i, state.ante);
     if (state.seats[i].refilled) say(state, `${state.seats[i].name}의 칩이 다 떨어져 기본 칩 ${REFILL_CHIPS}칩을 다시 지급했습니다.`);
   }
-  say(state, `앤티 ${ANTE}칩씩 걸었습니다.`);
+  say(state, `앤티 ${state.ante}칩씩 걸었습니다.`);
   // 3장씩 배분
   for (let r = 0; r < 3; r++) {
     for (const s of state.seats) {
@@ -227,7 +258,7 @@ export function legalActions(state: GameState, seat: number): Action[] {
   const actions: Action[] = ['fold'];
   if (toCall === 0) actions.push('check');
   else if (s.chips >= toCall) actions.push('call');
-  const unit = BET_UNITS[state.street];
+  const unit = state.betUnits[state.street];
   if (state.raisesUsed < MAX_RAISES_PER_STREET && s.chips >= toCall + unit) actions.push('raise');
   // 콜할 칩이 부족하면 올인 콜 허용
   if (toCall > 0 && s.chips > 0 && !actions.includes('call')) actions.push('call');
@@ -238,7 +269,7 @@ export function applyAction(state: GameState, seat: number, action: Action, rng:
   if (!legalActions(state, seat).includes(action)) return;
   const s = state.seats[seat];
   const toCall = state.currentBet - s.bet;
-  const unit = BET_UNITS[state.street];
+  const unit = state.betUnits[state.street];
   if (action === 'fold') {
     s.folded = true;
     say(state, `${s.name} 다이.`);
