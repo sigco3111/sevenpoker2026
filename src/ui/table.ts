@@ -280,6 +280,13 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
         cards.appendChild(ce);
       });
       seat.appendChild(cards);
+      // 승부 공개된 자리의 족보 이름(생존 자리만, 다이·비공개 판은 표시 없음)
+      if (allShown && state.handNames[i]) {
+        const hn = document.createElement('div');
+        hn.className = 'pk-hand';
+        hn.textContent = state.handNames[i];
+        seat.appendChild(hn);
+      }
       felt.appendChild(seat);
     }
 
@@ -361,6 +368,12 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
     cardsWrap.appendChild(divider);
     cardsWrap.appendChild(hidCol);
     meBox.appendChild(cardsWrap);
+    if ((state.phase === 'showdown' || state.phase === 'hand-over') && state.showdownRevealed && !me.folded && state.handNames[0]) {
+      const hn = document.createElement('div');
+      hn.className = 'pk-hand';
+      hn.textContent = state.handNames[0];
+      meBox.appendChild(hn);
+    }
     el.appendChild(meBox);
 
     // 조작 영역
