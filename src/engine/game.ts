@@ -47,6 +47,7 @@ export interface GameState {
   resultText: string;
   handNumber: number;
   handStartChips: number[]; // 판 시작(앤티 전) 칩 — 판 종료 시 증감 표시용
+  lastResult: string; // 직전 판 결과 요약 (새 판 진행 중 표시)
   bestFive: { [seat: number]: number[] }; // 각 팟 수상자의 7장 중 족보를 이룬 5장 인덱스
   showdownRevealed: boolean; // 승부 공개까지 간 판이면 true (다이 종료 판은 패 비공개 유지)
 }
@@ -87,6 +88,7 @@ export function createGame(rng: () => number = Math.random, saved?: SavedProgres
     resultText: '',
     handNumber: saved && Number.isFinite(saved.hands) && saved.hands! >= 0 ? Math.floor(saved.hands!) : 0,
     handStartChips: seats.map((x) => x.chips),
+    lastResult: '',
     bestFive: {},
     showdownRevealed: false,
   };
@@ -125,6 +127,7 @@ export function startHand(state: GameState, rng: () => number = Math.random) {
   state.currentBet = 0;
   state.raisesUsed = 0;
   state.winners = [];
+  if (state.resultText) state.lastResult = state.resultText;
   state.resultText = '';
   state.acted = [false, false, false, false];
   state.revealPicked = [false, false, false, false];
