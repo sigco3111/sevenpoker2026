@@ -47,7 +47,7 @@ export const CATEGORY_NAME = [
   '하이카드', '원페어', '투페어', '트리플', '스트레이트', '플러시', '풀하우스', '포카드', '스트레이트플러시',
 ];
 
-function evaluate5(cards: Card[]): HandValue {
+export function evaluate5(cards: Card[]): HandValue {
   const ranks = cards.map((c) => c.rank).sort((a, b) => b - a);
   const flush = cards.every((c) => c.suit === cards[0].suit);
   const unique = [...new Set(ranks)].sort((a, b) => b - a);
@@ -82,19 +82,27 @@ function evaluate5(cards: Card[]): HandValue {
 }
 
 // n장(5~7) 중 가장 강한 5장 조합
-export function evaluate7(cards: Card[]): HandValue {
+export function evaluate7Best(cards: Card[]): { value: HandValue; indices: number[] } {
   const n = cards.length;
   let best: HandValue | null = null;
+  let bestIdx: number[] = [];
   for (let a = 0; a < n - 4; a++)
     for (let b = a + 1; b < n - 3; b++)
       for (let c = b + 1; c < n - 2; c++)
         for (let d = c + 1; d < n - 1; d++)
           for (let e = d + 1; e < n; e++) {
             const v = evaluate5([cards[a], cards[b], cards[c], cards[d], cards[e]]);
-            if (!best || compareHandValue(v, best) > 0) best = v;
+            if (!best || compareHandValue(v, best) > 0) {
+              best = v;
+              bestIdx = [a, b, c, d, e];
+            }
           }
   if (!best) throw new Error('evaluate7 needs at least 5 cards');
-  return best;
+  return { value: best, indices: bestIdx };
+}
+
+export function evaluate7(cards: Card[]): HandValue {
+  return evaluate7Best(cards).value;
 }
 
 // 양수면 a가 강함. 족보 → 숫자 → 무늬 서열(제안 기본값) 순.

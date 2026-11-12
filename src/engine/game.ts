@@ -4,7 +4,7 @@
 // 제안 기본값(사용자 미확정): 앤티 10, 시작 칩 1500, 리필 1000, 베팅 단위 50/50/100/100,
 //          스트리트당 레이즈 최대 2회, 무늬 서열 스다하크, 팟은 단독 승자에게(무늬 서열로 동률 해소).
 
-import { Card, newDeck, shuffle, evaluate7, compareHandValue, compareUpcards, HandValue, CATEGORY_NAME } from './cards';
+import { Card, newDeck, shuffle, evaluate7, evaluate7Best, compareHandValue, compareUpcards, HandValue, CATEGORY_NAME } from './cards';
 
 export const ANTE = 10; // 제안 기본값
 export const START_CHIPS = 1500; // 제안 기본값
@@ -46,6 +46,8 @@ export interface GameState {
   winners: number[];
   resultText: string;
   handNumber: number;
+  handStartChips: number[]; // 판 시작(앤티 전) 칩 — 판 종료 시 증감 표시용
+  bestFive: number[]; // 승자 7장 중 족보를 이룬 5장의 인덱스
 }
 
 export interface SavedProgress {
@@ -83,6 +85,8 @@ export function createGame(rng: () => number = Math.random, saved?: SavedProgres
     winners: [],
     resultText: '',
     handNumber: saved && Number.isFinite(saved.hands) && saved.hands! >= 0 ? Math.floor(saved.hands!) : 0,
+    handStartChips: seats.map((x) => x.chips),
+    bestFive: [],
   };
   startHand(state, rng);
   return state;
@@ -136,6 +140,9 @@ export function startHand(state: GameState, rng: () => number = Math.random) {
     s.bet = 0;
     s.committed = 0;
   }
+  // 재지급 반영 후, 앤티 전 칩을 기준으로 기록
+  state.handStartChips = state.seats.map((x) => x.chips);
+  state.bestFive = [];
   say(state, `— ${state.handNumber}번째 판 —`);
   for (let i = 0; i < state.seats.length; i++) {
     pay(state, i, ANTE);
@@ -283,6 +290,7 @@ function showdown(state: GameState) {
     if (compareHandValue(values.get(i)!, values.get(best)!) > 0) best = i;
   }
   const v = values.get(best)!;
+  state.bestFive = evaluate7Best(state.seats[best].cards).indices;
   say(state, `승부 공개: ${state.seats[best].name} ${CATEGORY_NAME[v.category]}.`);
   settlePots(state, values, best);
 }
