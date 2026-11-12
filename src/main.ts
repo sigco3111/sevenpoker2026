@@ -59,6 +59,7 @@ function startChapter(index: number) {
   show(() =>
       mountTable(app, state, {
       title: chapter.title,
+      goalChips: chapter.goalChips,
       persist: false, // 스토리 대국 중의 칩은 저장하지 않는다(자유대국 저장 보존)
       onExit: showMenu,
       onHandOver: (st) => {
