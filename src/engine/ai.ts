@@ -57,9 +57,15 @@ const LINES: Record<Personality, Record<Situation, string[]>> = {
   },
 };
 
+// 자리의 실제 성향: 상태에 지정된 캐릭터 성향을 우선하고, 없으면 자리별 기본값
+export function seatPersonality(state: GameState, seat: number): Personality {
+  const p = state.seats[seat]?.personality as Personality | undefined;
+  return p && p in MODEL ? p : PERSONALITY[seat] ?? 'balanced';
+}
+
 // 상황별 대사 한 줄 (제안 초안). seat 0(나)은 캐릭터가 없어 쓰지 않는다.
-export function aiLine(seat: number, situation: Situation, rng: () => number = Math.random): string {
-  const bank = LINES[PERSONALITY[seat] ?? 'balanced'][situation];
+export function aiLine(seat: number, situation: Situation, rng: () => number = Math.random, personality?: Personality): string {
+  const bank = LINES[personality ?? PERSONALITY[seat] ?? 'balanced'][situation];
   return bank[Math.floor(rng() * bank.length)];
 }
 
@@ -128,7 +134,7 @@ export function aiTurn(state: GameState, seat: number, rng: () => number = Math.
   const toCall = state.currentBet - s.bet;
   const me = myStrength(state, seat).score;
   const opp = bestVisibleOpponent(state, seat);
-  const p = PERSONALITY[seat] ?? 'balanced';
+  const p = seatPersonality(state, seat);
   const m = MODEL[p];
   const roll = rng();
 
