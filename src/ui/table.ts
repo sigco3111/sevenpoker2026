@@ -66,6 +66,9 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
   }
 
   function saveChips() {
+    // 저장은 판 종료 시점에만 한다. 판 도중(베팅이 팟에 묶인 상태) 저장하면
+    // 앱을 닫았다 열었을 때 진행 중이던 팟이 사라져 전체 칩이 새는 문제가 있다.
+    if (state.phase !== 'hand-over') return;
     try {
       localStorage.setItem('sevenpoker2026.chips', JSON.stringify(state.seats.map((s) => s.chips)));
       localStorage.setItem('sevenpoker2026.hands', String(state.handNumber));
