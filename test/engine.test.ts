@@ -457,3 +457,16 @@ describe('승부 공개 표시 데이터(최적 5장·칩 증감)', () => {
     expect(Object.keys(g.bestFive).length).toBe(0);
     expect(g.showdownRevealed).toBe(false);
   });
+
+  it('직전 판 요약: 새 판을 시작하면 지난 판 결과가 lastResult에 보존된다', () => {
+    const g = createGame(() => 0.5);
+    for (let i = 0; i < 4; i++) chooseReveal(g, i, 0);
+    let guard = 0;
+    while (g.phase !== 'hand-over' && guard++ < 10) applyAction(g, g.turn, 'fold');
+    expect(g.phase).toBe('hand-over');
+    const prev = g.resultText;
+    expect(prev.length).toBeGreaterThan(0);
+    startHand(g);
+    expect(g.lastResult).toBe(prev);
+    expect(g.resultText).toBe('');
+  });
