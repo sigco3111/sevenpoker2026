@@ -47,7 +47,8 @@ export interface GameState {
   resultText: string;
   handNumber: number;
   handStartChips: number[]; // 판 시작(앤티 전) 칩 — 판 종료 시 증감 표시용
-  bestFive: number[]; // 승자 7장 중 족보를 이룬 5장의 인덱스
+  bestFive: { [seat: number]: number[] }; // 각 팟 수상자의 7장 중 족보를 이룬 5장 인덱스
+  showdownRevealed: boolean; // 승부 공개까지 간 판이면 true (다이 종료 판은 패 비공개 유지)
 }
 
 export interface SavedProgress {
@@ -86,7 +87,8 @@ export function createGame(rng: () => number = Math.random, saved?: SavedProgres
     resultText: '',
     handNumber: saved && Number.isFinite(saved.hands) && saved.hands! >= 0 ? Math.floor(saved.hands!) : 0,
     handStartChips: seats.map((x) => x.chips),
-    bestFive: [],
+    bestFive: {},
+    showdownRevealed: false,
   };
   startHand(state, rng);
   return state;
@@ -142,7 +144,8 @@ export function startHand(state: GameState, rng: () => number = Math.random) {
   }
   // 재지급 반영 후, 앤티 전 칩을 기준으로 기록
   state.handStartChips = state.seats.map((x) => x.chips);
-  state.bestFive = [];
+  state.bestFive = {};
+  state.showdownRevealed = false;
   say(state, `— ${state.handNumber}번째 판 —`);
   for (let i = 0; i < state.seats.length; i++) {
     pay(state, i, ANTE);
@@ -290,9 +293,9 @@ function showdown(state: GameState) {
     if (compareHandValue(values.get(i)!, values.get(best)!) > 0) best = i;
   }
   const v = values.get(best)!;
-  state.bestFive = evaluate7Best(state.seats[best].cards).indices;
+  state.showdownRevealed = true;
   say(state, `승부 공개: ${state.seats[best].name} ${CATEGORY_NAME[v.category]}.`);
-  settlePots(state, values, best);
+  settlePots(state, values);
 }
 
 // 기여금(committed) 구간별로 팟을 나눠 각 구간의 수상 자격자 중 최강 패가 가져간다.
@@ -301,7 +304,7 @@ function showdown(state: GameState) {
 // 환불 구간(수상이 아니라 돌려받는 칩) 두 가지:
 //  - 기여자가 본인뿐인 구간: 아무도 못 받은 미콜 베팅이므로 본인에게 반환
 //  - 비폴드 자격자가 0명인 구간: 자발적 다이 등으로 발생 가능. 구간 기여분을 기여자 각자에게 반환
-function settlePots(state: GameState, values: Map<number, HandValue>, bestOverall: number) {
+function settlePots(state: GameState, values: Map<number, HandValue>) {
   const levels = [...new Set(state.seats.map((s) => s.committed))].filter((c) => c > 0).sort((a, b) => a - b);
   const winnings = new Map<number, number>();
   const refunds = new Map<number, number>();
@@ -329,7 +332,9 @@ function settlePots(state: GameState, values: Map<number, HandValue>, bestOveral
     add(winnings, winner, share * contributors.length);
   }
   state.phase = 'hand-over';
-  state.winners = [bestOverall];
+  // 각 구간(메인팟·사이드팟)의 실제 수상자 전원을 승자로 표시하고, 각자의 족보 5장을 계산
+  state.winners = [...winnings.keys()];
+  for (const w of state.winners) state.bestFive[w] = evaluate7Best(state.seats[w].cards).indices;
   const potWon = state.pot;
   for (const [i, amount] of winnings) state.seats[i].chips += amount;
   for (const [i, amount] of refunds) state.seats[i].chips += amount;
