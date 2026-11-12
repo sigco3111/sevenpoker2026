@@ -2,7 +2,7 @@
 // 테이블 구성: 펠트 위 상대 3인 + 중앙 덱/팟, 아래 내 자리. 딜링·뒤집기 연출 포함.
 import { Card, rankLabel, SUIT_LABEL } from '../engine/cards';
 import { GameState, legalActions, needsAction, chooseReveal, applyAction, startHand, BET_UNITS } from '../engine/game';
-import { aiChooseReveal, aiDecide } from '../engine/ai';
+import { aiChooseReveal, aiTurn, aiLine } from '../engine/ai';
 
 const AVATARS = ['', 'avatars/avatar-1.png', 'avatars/avatar-2.png', 'avatars/avatar-3.png'];
 const AI_DELAY = 650;
@@ -24,6 +24,11 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
   // 연출용 이전 상태 (자리별 카드 수, 공개 여부)
   let prevCounts = [0, 0, 0, 0];
   let prevVis: boolean[][] = [[], [], [], []];
+
+  // AI 대사(제안 초안): 자리별 최근 한 줄. 새 판이 시작되면 지운다.
+  let lines: (string | null)[] = [null, null, null, null];
+  let lineHand = 0;
+  let prevPhase = '';
 
   function cardEl(card: Card | null, opts: { big?: boolean; mini?: boolean; pickable?: boolean; flip?: boolean; onPick?: () => void } = {}) {
     const d = document.createElement(opts.onPick ? 'button' : 'div');
@@ -66,6 +71,7 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
           if (i === 0 && !delegated) continue; // 위임 중이면 내 공개 패도 AI가 선택
           if (!state.revealPicked[i]) {
             chooseReveal(state, i, aiChooseReveal(state, i));
+            if (i >= 1) lines[i] = aiLine(i, 'reveal');
             acted = true;
             break;
           }
@@ -74,8 +80,9 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
         const need = needsAction(state);
         if (need === 'ai' || (need === 'player' && delegated)) {
           const seat = state.turn;
-          const action = aiDecide(state, seat);
+          const { action, line } = aiTurn(state, seat);
           applyAction(state, seat, action);
+          if (seat >= 1) lines[seat] = line;
           acted = true;
         }
       } else if (state.phase === 'hand-over' && delegated) {
@@ -138,6 +145,18 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
   }
 
   function render() {
+    if (state.handNumber !== lineHand) {
+      lines = [null, null, null, null]; // 새 판: 대사 초기화
+      lineHand = state.handNumber;
+    }
+    if (state.phase === 'hand-over' && prevPhase !== 'hand-over') {
+      // 승부 결과에 맞춰 승자·패자 대사(제안 초안)
+      for (let i = 1; i < 4; i++) {
+        if (state.winners.includes(i)) lines[i] = aiLine(i, 'win');
+        else if (!state.seats[i].folded) lines[i] = aiLine(i, 'lose');
+      }
+    }
+    prevPhase = state.phase;
     const me = state.seats[0];
     const myTurn = needsAction(state) === 'player';
     const legal = legalActions(state, 0);
@@ -169,7 +188,11 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
     for (let i = 1; i < 4; i++) {
       const s = state.seats[i];
       const seat = document.createElement('div');
-      seat.className = `pk-opp pk-opp-${i}` + (s.folded ? ' pk-folded' : '') + (state.phase === 'betting' && state.turn === i ? ' pk-active' : '');
+      seat.className =
+        `pk-opp pk-opp-${i}` +
+        (s.folded ? ' pk-folded' : '') +
+        (state.phase === 'betting' && state.turn === i ? ' pk-active' : '') +
+        (state.phase === 'hand-over' && state.winners.includes(i) ? ' pk-winner' : '');
       const top = document.createElement('div');
       top.className = 'pk-opp-top';
       const ava = document.createElement('img');
@@ -182,6 +205,10 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
       info.innerHTML = `<span class="pk-name">${s.name}</span><span class="pk-chips">${s.chips.toLocaleString()}칩${s.folded ? ' · 다이' : ''}</span>`;
       top.appendChild(info);
       seat.appendChild(top);
+      const lineEl = document.createElement('div');
+      lineEl.className = 'pk-line';
+      lineEl.textContent = lines[i] ?? '';
+      seat.appendChild(lineEl);
       const cards = document.createElement('div');
       cards.className = 'pk-cards';
       const allShown = state.phase === 'showdown' || state.phase === 'hand-over';
@@ -212,7 +239,8 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
 
     // 내 자리
     const meBox = document.createElement('div');
-    meBox.className = 'pk-me' + (delegated ? ' pk-delegated' : '');
+    meBox.className =
+      'pk-me' + (delegated ? ' pk-delegated' : '') + (state.phase === 'hand-over' && state.winners.includes(0) ? ' pk-winner' : '');
     const head = document.createElement('div');
     head.className = 'pk-me-head';
     head.innerHTML = `<span class="pk-me-name">나${delegated ? ' · <span class="pk-badge">위임 중</span>' : ''}${me.folded ? ' · 다이' : ''}</span>`;
