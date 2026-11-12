@@ -22,6 +22,7 @@ export interface TableOptions {
   persist?: boolean; // 기본 true. false면 진행 저장을 끈다(스토리 등 별도 저장 모드)
   onExit?: () => void; // 주어지면 '메뉴로' 버튼을 표시
   onHandOver?: (state: GameState) => void; // 판이 끝나 hand-over에 진입할 때마다 호출
+  goalChips?: number; // 스토리 챕터 목표 칩. 주어지면 제목 줄에 목표까지 남은 칩을 함께 표시
 }
 
 export function mountTable(root: HTMLElement, state: GameState, opts?: TableOptions): UI {
@@ -220,7 +221,10 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
 
     const title = document.createElement('div');
     title.className = 'pk-title';
-    title.innerHTML = `<span>세븐포커2026 <small>${opts?.title ?? '자유 대국'} · ${state.handNumber}번째 판</small></span>`;
+    const goal = opts?.goalChips;
+    const remain = goal !== undefined ? goal - state.seats[0].chips : 0;
+    const goalText = goal !== undefined ? ` · 목표 ${goal}칩${remain > 0 ? `까지 ${remain}칩` : ' 달성'}` : '';
+    title.innerHTML = `<span>세븐포커2026 <small>${opts?.title ?? '자유 대국'} · ${state.handNumber}번째 판${goalText}</small></span>`;
     if (opts?.onExit) {
       const exit = document.createElement('button');
       exit.className = 'pk-exit';
@@ -298,13 +302,21 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
       const allShown = (state.phase === 'showdown' || state.phase === 'hand-over') && state.showdownRevealed && !s.folded;
       const order = s.cards.map((c, ci) => ({ c, ci }))
         .sort((a, b) => Number(allShown || s.revealed[b.ci]) - Number(allShown || s.revealed[a.ci]));
+      // 숨김 패(뒷면)와 공개 패를 구획 분리. 넓은 화면에서는 display:contents로 기존 한 행 배치와 동일하고,
+      // 좁은 화면(≤360px)에서는 뒷면을 컴팩트 스택으로 접어 공개 4장의 랭크·무늬 전면 식별을 지킨다.
+      const backs = document.createElement('div');
+      backs.className = 'pk-backs';
+      const opens = document.createElement('div');
+      opens.className = 'pk-opens';
+      cards.appendChild(backs);
+      cards.appendChild(opens);
       order.forEach(({ c, ci }) => {
         const visible = allShown || s.revealed[ci];
         const wasVisible = prevVis[i][ci] === true;
         const flip = visible && !wasVisible && prevCounts[i] >= s.cards.length;
         const ce = cardEl(visible ? c : null, { mid: true, flip, flipDelay: flip && state.phase !== 'betting' ? flipSeq++ * 120 : 0, five: state.phase === 'hand-over' && (state.bestFive[i] ?? []).includes(ci) });
         cardEls[i][ci] = ce;
-        cards.appendChild(ce);
+        (visible ? opens : backs).appendChild(ce);
       });
       seat.appendChild(cards);
       // 승부 공개된 자리의 족보 이름(생존 자리만, 다이·비공개 판은 표시 없음)
