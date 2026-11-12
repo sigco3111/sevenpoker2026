@@ -78,7 +78,7 @@ button { font: inherit; cursor: pointer; }
 /* 딜링 비행 + 뒤집기 연출 */
 .pk-fly { position: fixed; z-index: 60; pointer-events: none; margin: 0; }
 @keyframes pkflip { from { transform: rotateY(90deg) scale(.92); } to { transform: rotateY(0) scale(1); } }
-.pk-flipin { animation: pkflip .45s ease; }
+.pk-flipin { animation: pkflip .45s ease backwards; }
 
 /* 내 자리 */
 .pk-me { margin-top: 10px; background: #fff; border: 2px solid var(--coral); border-radius: 16px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 3px 10px rgba(0,0,0,.08); }
