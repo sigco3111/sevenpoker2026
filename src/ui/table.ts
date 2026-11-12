@@ -4,11 +4,11 @@ import { Card, rankLabel, SUIT_LABEL } from '../engine/cards';
 import { GameState, legalActions, needsAction, chooseReveal, applyAction, startHand, progressSnapshot } from '../engine/game';
 import { readProgress, createProgressSaver, resolveLocksApi } from '../engine/persist';
 import { aiChooseReveal, aiTurn, aiLine, seatPersonality } from '../engine/ai';
+import { loadSpeed, saveSpeed, pace } from '../settings';
 
 const AVATARS = ['', 'avatars/avatar-1.png', 'avatars/avatar-2.png', 'avatars/avatar-3.png'];
-const AI_DELAY = 650;
-const NEXT_HAND_DELAY = 3500; // 위임 중 결과를 읽을 시간 (순차 뒤집기 완료 후 여유)
-const FLY_MS = 550; // 딜링 비행 시간
+// 진행 속도 수치는 settings.ts로 이동(기본값 동일). 매 대기·비행 시작 시점에 pace()로 읽어
+// 플레이 중 속도 전환이 다음 턴·비행부터 자연 적용되게 한다(진행 중 연출은 유지).
 
 export interface UI {
   el: HTMLElement;
@@ -121,7 +121,7 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
           if (i === 0 && !delegated) continue; // 위임 중이면 내 공개 패도 AI가 선택
           if (!state.revealPicked[i]) {
             chooseReveal(state, i, aiChooseReveal(state, i));
-            if (i >= 1) lines[i] = aiLine(i, 'reveal', Math.random, seatPersonality(state, i));
+            if (i >= 1) lines[i] = aiLine(i, 'reveal', Math.random, seatPersonality(state, i), state.seats[i].name);
             acted = true;
             break;
           }
@@ -142,7 +142,7 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
       if (acted) {
         saveChips();
         busy = true;
-        const delay = state.phase === 'hand-over' ? NEXT_HAND_DELAY : AI_DELAY;
+        const delay = state.phase === 'hand-over' ? pace().nextHandDelay : pace().aiDelay;
         setTimeout(() => {
           busy = false;
           if (state.phase === 'hand-over') {
@@ -163,6 +163,7 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
   // 리렌더가 있어도 비행이 끝까지 이어지게 한다. 목표가 교체되면 새 요소를 숨기고
   // 그 위치로 이어서 날아간다.
   function animateDeals(newBySeat: { seat: number; cis: number[] }[]) {
+    const flyMs = pace().flyMs;
     for (const { seat, cis } of newBySeat) {
       cis.forEach((ci, k) => {
         const deck0 = el.querySelector('.pk-deck');
@@ -188,7 +189,7 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
             target.style.visibility = 'hidden';
             hidden = target;
           }
-          const t = Math.min(1, Math.max(0, (performance.now() - startAt) / FLY_MS));
+          const t = Math.min(1, Math.max(0, (performance.now() - startAt) / flyMs));
           const e = 1 - Math.pow(1 - t, 3); // easeOutCubic
           const dr = deck.getBoundingClientRect();
           const sx = dr.left + dr.width / 2;
@@ -214,8 +215,8 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
       opts?.onHandOver?.(state);
       // 승부 결과에 맞춰 승자·패자 대사(제안 초안)
       for (let i = 1; i < 4; i++) {
-        if (state.winners.includes(i)) lines[i] = aiLine(i, 'win', Math.random, seatPersonality(state, i));
-        else if (!state.seats[i].folded) lines[i] = aiLine(i, 'lose', Math.random, seatPersonality(state, i));
+        if (state.winners.includes(i)) lines[i] = aiLine(i, 'win', Math.random, seatPersonality(state, i), state.seats[i].name);
+        else if (!state.seats[i].folded) lines[i] = aiLine(i, 'lose', Math.random, seatPersonality(state, i), state.seats[i].name);
       }
     }
     prevPhase = state.phase;
@@ -243,6 +244,19 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
     const rank = total !== undefined ? 1 + state.seats.filter((s) => s.chips > state.seats[0].chips).length : 0;
     const handText = total !== undefined ? `${Math.min(state.handNumber, total)}/${total}판 · 현재 ${rank}위` : `${state.handNumber}번째 판`;
     title.innerHTML = `<span>세븐포커2026 <small>${opts?.title ?? '자유 대국'} · ${handText}${goalText}</small></span>`;
+    {
+      const speedBtn = document.createElement('button');
+      speedBtn.className = 'pk-speed';
+      const fast = loadSpeed() === 'fast';
+      speedBtn.textContent = `빠르게 ${fast ? '켜짐' : '꺼짐'}`;
+      speedBtn.title = '대국 진행 속도를 바꿉니다. 비행 연출과 규칙은 그대로입니다.';
+      speedBtn.setAttribute('aria-pressed', String(fast));
+      speedBtn.onclick = () => {
+        saveSpeed(fast ? 'normal' : 'fast');
+        render();
+      };
+      title.appendChild(speedBtn);
+    }
     if (opts?.onExit) {
       const exit = document.createElement('button');
       exit.className = 'pk-exit';
