@@ -513,3 +513,66 @@ describe('승부 공개 표시 데이터(최적 5장·칩 증감)', () => {
     expect(g.lastResult).toBe(prev);
     expect(g.resultText).toBe('');
   });
+
+describe('승부 공개 족보 라벨 데이터(handNames)', () => {
+  const lcg2 = (seed: number) => () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+
+  it('승부 공개 시 생존 자리 전원의 족보가 기록되고 다이한 자리는 없다', () => {
+    const rng = lcg2(777);
+    const g = createGame(rng);
+    let guard = 0;
+    while (guard++ < 5000) {
+      while (g.phase !== 'hand-over' && guard++ < 5000) {
+        if (g.phase === 'choose-reveal') {
+          for (let i = 0; i < 4; i++) if (!g.revealPicked[i]) chooseReveal(g, i, aiChooseReveal(g, i));
+        } else if (g.phase === 'betting') {
+          const seat = g.turn;
+          const { action } = aiTurn(g, seat, rng);
+          applyAction(g, seat, action, rng);
+        } else break;
+      }
+      if (g.resultText.includes('승부 공개')) break;
+      startHand(g, rng);
+    }
+    expect(g.showdownRevealed).toBe(true);
+    const seats = Object.keys(g.handNames).map(Number);
+    expect(seats.length).toBeGreaterThanOrEqual(2);
+    for (const i of seats) {
+      expect(g.seats[i].folded).toBe(false); // 생존 자리만
+      expect(g.handNames[i]).toBe(CATEGORY_NAME[evaluate7(g.seats[i].cards).category]); // 실제 족보와 일치
+    }
+    for (let i = 0; i < 4; i++) {
+      if (g.seats[i].folded) expect(g.handNames[i]).toBeUndefined(); // 다이 자리는 라벨 없음
+    }
+  });
+
+  it('모두 다이로 끝난 판은 handNames가 비어 있다', () => {
+    const g = createGame(() => 0.5);
+    for (let i = 0; i < 4; i++) chooseReveal(g, i, 0);
+    let guard = 0;
+    while (g.phase !== 'hand-over' && guard++ < 10) applyAction(g, g.turn, 'fold');
+    expect(g.phase).toBe('hand-over');
+    expect(Object.keys(g.handNames).length).toBe(0);
+  });
+
+  it('새 판을 시작하면 handNames가 지워진다', () => {
+    const rng = lcg2(777);
+    const g = createGame(rng);
+    let guard = 0;
+    while (guard++ < 5000) {
+      while (g.phase !== 'hand-over' && guard++ < 5000) {
+        if (g.phase === 'choose-reveal') {
+          for (let i = 0; i < 4; i++) if (!g.revealPicked[i]) chooseReveal(g, i, aiChooseReveal(g, i));
+        } else if (g.phase === 'betting') {
+          const { action } = aiTurn(g, g.turn, rng);
+          applyAction(g, g.turn, action, rng);
+        } else break;
+      }
+      if (g.resultText.includes('승부 공개')) break;
+      startHand(g, rng);
+    }
+    expect(Object.keys(g.handNames).length).toBeGreaterThan(0);
+    startHand(g, rng);
+    expect(Object.keys(g.handNames).length).toBe(0);
+  });
+});
