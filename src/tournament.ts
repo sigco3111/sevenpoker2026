@@ -28,7 +28,7 @@ export const TOURNAMENT_STAGES: TournamentStage[] = [
     hands: 8,
     ante: 10,
     betUnits: [50, 50, 100, 100],
-    // 아트 자산 4종 한정: 메뉴 타일(v5 시안)과 같은 매핑으로 스토리 챕터 아트와 구분
+    // 아트 자산 6종: 메뉴 타일과 같은 매핑으로 스토리 챕터 아트와 구분
     image: 'illust/story-ch2.png',
     introLines: ['선셋 컵 예선이 시작됩니다.', '{hands}판을 치른 뒤 칩이 가장 많으면 통과입니다.'],
     clearLines: ['예선 통과! 준결승 테이블이 열렸습니다.'],
@@ -55,7 +55,7 @@ export const TOURNAMENT_STAGES: TournamentStage[] = [
     hands: 10,
     ante: 30,
     betUnits: [150, 150, 300, 300],
-    image: 'illust/menu-hero.png',
+    image: 'illust/1-tour-final.png',
     introLines: ['선셋 컵 결승. 클럽의 강자들이 모였습니다.', '{hands}판 뒤 1위가 우승 트로피를 가져갑니다.'],
     clearLines: ['우승! 선셋 컵 챔피언입니다.'],
     failLines: ['준우승에 머물렀습니다. 결승에서 다시 도전하세요.'],
