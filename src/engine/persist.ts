@@ -87,6 +87,13 @@ export interface LocksLike {
   request(name: string, cb: () => void): Promise<unknown>;
 }
 
+// Web Locks 지원 판정은 이 함수 하나만 쓴다(저장 오케스트레이션과
+// 미지원 안내 표시가 같은 판정을 공유하기 위함).
+export function resolveLocksApi(candidate: unknown): LocksLike | null {
+  const api = candidate as LocksLike | undefined | null;
+  return api && typeof api.request === 'function' ? api : null;
+}
+
 export interface StorageSourceLike {
   addEventListener(type: 'storage', listener: (e: { key: string | null }) => void): void;
 }
@@ -115,8 +122,7 @@ export interface ProgressSaver {
 export function createProgressSaver(opts: ProgressSaverOptions): ProgressSaver {
   const { store, tabId } = opts;
   const lockName = opts.lockName ?? 'sevenpoker2026.save';
-  const locksApi =
-    opts.locksApi && typeof opts.locksApi.request === 'function' ? opts.locksApi : null;
+  const locksApi = resolveLocksApi(opts.locksApi);
   let blocked = false;
   let guardArmed = false;
 
