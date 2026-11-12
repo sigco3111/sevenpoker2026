@@ -89,7 +89,7 @@ export function mountMenu(root: HTMLElement, story: StoryProgress, tour: Tournam
   const stageIndex = Math.min(tour.stage, TOURNAMENT_STAGES.length - 1);
   const tourLabel = tour.won ? '우승 완료' : tour.stage === 0 ? `예선 · ${TOURNAMENT_STAGES[0].hands}판` : `${TOURNAMENT_STAGES[stageIndex].name} 진행 중`;
   // 승인 시안(v5) 기준: 토너먼트 타일은 스토리 타일과 다른 아트 사용 (자산 4종 한정으로 스테이지별 매핑)
-  const TOUR_TILE_ART = ['illust/story-ch2.png', 'illust/story-ch3.png', 'illust/menu-hero.png'];
+  const TOUR_TILE_ART = ['illust/story-ch2.png', 'illust/story-ch3.png', 'illust/1-tour-final.png'];
   const tourIn = artTile(tourBtn, TOUR_TILE_ART[stageIndex]);
   tourIn.innerHTML = `<strong>토너먼트</strong><span class="badge">${tourLabel}</span><span class="d">선셋 컵 — 예선·준결승·결승을 이겨 우승하세요.</span>`;
   const tourGo = document.createElement('span');
@@ -102,7 +102,7 @@ export function mountMenu(root: HTMLElement, story: StoryProgress, tour: Tournam
   // 자유 대국: 저장된 진행(판 수)이 있으면 이어하기
   const free = document.createElement('button');
   const hands = progress.hands ?? 0;
-  const freeIn = artTile(free, 'illust/menu-hero.png', 'free');
+  const freeIn = artTile(free, 'illust/1-free-game.png', 'free');
   freeIn.innerHTML = `<strong>자유 대국</strong><span class="badge">${hands > 0 ? `${hands + 1}번째 판 이어하기` : '언제든 한 판'}</span><span class="d">AI 3인과 제한 없는 대국. 진행은 저장됩니다.</span>`;
   const freeGo = document.createElement('span');
   freeGo.className = 'go';
