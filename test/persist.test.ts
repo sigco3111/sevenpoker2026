@@ -126,3 +126,108 @@ describe('진행 복원(readProgress)', () => {
     expect(readProgress(store)).toEqual({ chips: undefined, hands: 8 });
   });
 });
+
+// ---- 저장 오케스트레이션: Web Locks 유무에 따른 두 경로를 그대로 실행해 검증 ----
+import { createProgressSaver, LocksLike, StorageSourceLike } from '../src/engine/persist';
+
+// 실제로 직렬화하는 모의 Web Locks: 콜백을 체인에 쌓아 한 번에 하나씩 실행한다.
+function makeLocks() {
+  const calls: string[] = [];
+  let tail: Promise<unknown> = Promise.resolve();
+  const locks: LocksLike = {
+    request: (name, cb) => {
+      calls.push(name);
+      const run = tail.then(() => cb());
+      tail = run.catch(() => {});
+      return run;
+    },
+  };
+  return { locks, calls };
+}
+
+// storage 이벤트를 흉내 내는 모의 이벤트 소스(미지원 경로의 window 역할)
+function makeEvents() {
+  const listeners: ((e: { key: string | null }) => void)[] = [];
+  const events: StorageSourceLike = {
+    addEventListener: (_type, l) => { listeners.push(l); },
+  };
+  return { events, fire: (key: string | null) => listeners.forEach((l) => l({ key })) };
+}
+
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+describe('저장 오케스트레이션(createProgressSaver)', () => {
+  it('Web Locks 경로: 잠금 이름으로 직렬화 요청하고 저장한다', async () => {
+    const { store, data } = makeStore();
+    const { locks, calls } = makeLocks();
+    const saver = createProgressSaver({ store, tabId: 'tabA', locksApi: locks });
+    saver.save(snap(5));
+    await tick();
+    expect(calls).toEqual(['sevenpoker2026.save']);
+    expect(JSON.parse(data.get(STORE_KEYS.save)!).tabId).toBe('tabA');
+    expect(saver.blocked).toBe(false);
+  });
+
+  it('Web Locks 경로: 두 탭의 동일 판 동시 저장이 직렬화되어 나중 탭만 차단된다', async () => {
+    // 같은 저장소를 공유하는 두 saver가 같은 시점에 save를 호출한다.
+    // 모의 잠금이 콜백을 직렬화하므로, 먼저 임계 구역에 들어간 탭만 기록되고
+    // 나중 탭은 이미 기록된 같은 판을 보고 차단된다.
+    const { store, data } = makeStore();
+    const { locks } = makeLocks();
+    const blockedBy: string[] = [];
+    const saverA = createProgressSaver({ store, tabId: 'tabA', locksApi: locks, onBlocked: () => blockedBy.push('A') });
+    const saverB = createProgressSaver({ store, tabId: 'tabB', locksApi: locks, onBlocked: () => blockedBy.push('B') });
+    saverA.save(snap(301));
+    saverB.save(snap(301));
+    await tick();
+    await tick();
+    expect(JSON.parse(data.get(STORE_KEYS.save)!).tabId).toBe('tabA'); // 덮어쓰기 없음
+    expect(saverA.blocked).toBe(false);
+    expect(saverB.blocked).toBe(true);
+    expect(blockedBy).toEqual(['B']); // 차단 콜백은 B에서만
+  });
+
+  it('미지원 경로: 외부 기록이 없으면 정상 저장하고 차단되지 않는다', () => {
+    const { store, data } = makeStore();
+    const { events } = makeEvents();
+    const saver = createProgressSaver({ store, tabId: 'tabA', locksApi: null, events });
+    saver.save(snap(5));
+    expect(JSON.parse(data.get(STORE_KEYS.save)!).tabId).toBe('tabA');
+    expect(saver.blocked).toBe(false);
+  });
+
+  it('미지원 경로: 다른 탭의 save2 기록이 보이면 차단하고 이후 저장하지 않는다', () => {
+    const { store, data } = makeStore();
+    const { events, fire } = makeEvents();
+    let blockedCalls = 0;
+    const saver = createProgressSaver({ store, tabId: 'tabA', locksApi: null, events, onBlocked: () => blockedCalls++ });
+    saver.save(snap(5)); // 첫 저장으로 가드가 켜진다
+    fire('sevenpoker2026.save2'); // 다른 탭의 기록 감지
+    expect(saver.blocked).toBe(true);
+    expect(blockedCalls).toBe(1);
+    saver.save(snap(6)); // 차단 뒤 저장 시도
+    expect(JSON.parse(data.get(STORE_KEYS.save)!).hands).toBe(5); // 그대로
+    // 무관한 키의 storage 이벤트는 무시한다
+  });
+
+  it('미지원 경로: 무관한 키의 storage 이벤트는 차단하지 않는다', () => {
+    const { store } = makeStore();
+    const { events, fire } = makeEvents();
+    const saver = createProgressSaver({ store, tabId: 'tabA', locksApi: null, events });
+    saver.save(snap(5));
+    fire('sevenpoker2026.chips');
+    fire(null);
+    expect(saver.blocked).toBe(false);
+  });
+
+  it('미지원 경로: 같은 판을 다른 탭이 먼저 저장했으면 차단 콜백이 호출된다', () => {
+    const { store, data } = makeStore({ [STORE_KEYS.save]: rec('tabB', 301) });
+    const { events } = makeEvents();
+    let blockedCalls = 0;
+    const saver = createProgressSaver({ store, tabId: 'tabA', locksApi: null, events, onBlocked: () => blockedCalls++ });
+    saver.save(snap(301));
+    expect(saver.blocked).toBe(true);
+    expect(blockedCalls).toBe(1);
+    expect(JSON.parse(data.get(STORE_KEYS.save)!).tabId).toBe('tabB'); // 덮어쓰기 없음
+  });
+});
