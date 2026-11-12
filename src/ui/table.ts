@@ -1,9 +1,9 @@
 // 대국 화면 렌더링과 조작. 모바일 한 화면 구성(390x844) 우선.
 // 테이블 구성: 펠트 위 상대 3인 + 중앙 덱/팟, 아래 내 자리. 딜링·뒤집기 연출 포함.
 import { Card, rankLabel, SUIT_LABEL } from '../engine/cards';
-import { GameState, legalActions, needsAction, chooseReveal, applyAction, startHand, BET_UNITS, progressSnapshot } from '../engine/game';
+import { GameState, legalActions, needsAction, chooseReveal, applyAction, startHand, progressSnapshot } from '../engine/game';
 import { readProgress, createProgressSaver, resolveLocksApi } from '../engine/persist';
-import { aiChooseReveal, aiTurn, aiLine } from '../engine/ai';
+import { aiChooseReveal, aiTurn, aiLine, seatPersonality } from '../engine/ai';
 
 const AVATARS = ['', 'avatars/avatar-1.png', 'avatars/avatar-2.png', 'avatars/avatar-3.png'];
 const AI_DELAY = 650;
@@ -13,14 +13,25 @@ const FLY_MS = 550; // 딜링 비행 시간
 export interface UI {
   el: HTMLElement;
   render(): void;
+  state: GameState;
+  unmount(): void; // 자동 진행 타이머를 멈추고 DOM에서 제거
 }
 
-export function mountTable(root: HTMLElement, state: GameState): UI {
+export interface TableOptions {
+  title?: string; // 기본 '자유 대국'
+  persist?: boolean; // 기본 true. false면 진행 저장을 끈다(스토리 등 별도 저장 모드)
+  onExit?: () => void; // 주어지면 '메뉴로' 버튼을 표시
+  onHandOver?: (state: GameState) => void; // 판이 끝나 hand-over에 진입할 때마다 호출
+}
+
+export function mountTable(root: HTMLElement, state: GameState, opts?: TableOptions): UI {
   const el = document.createElement('div');
   root.appendChild(el);
+  const persist = opts?.persist !== false;
 
   let delegated = false; // 위임 중 (확정: 직접 돌아올 때까지 계속)
   let busy = false;
+  let stopped = false; // unmount 후 자동 진행 중단
 
   // 연출용 이전 상태 (자리별 카드 수, 공개 여부)
   let prevCounts = [0, 0, 0, 0];
@@ -71,19 +82,24 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
   // 다른 탭의 저장과 한 번이라도 충돌하면 saver.blocked가 켜진다. 차단된 탭은 이후
   // 판을 더 진행해도 저장하지 않는다(따라잡은 뒤 덮어쓰는 것도 막기 위해).
   // 새로고침하면 최신 진행을 이어간다.
-  const locksApi = resolveLocksApi((navigator as { locks?: unknown }).locks);
+  // persist=false(스토리 등)면 저장 장치를 만들지 않는다. 자유대국 저장(save2)을
+  // 다른 모드의 진행으로 덮어쓰지 않기 위함이며, 이 경우 Web Locks 안내도 띄우지 않는다.
+  const locksApi = persist ? resolveLocksApi((navigator as { locks?: unknown }).locks) : null;
   const locksSupported = locksApi !== null;
-  const saver = createProgressSaver({
-    store: localStorage,
-    tabId: TAB_ID,
-    locksApi,
-    events: window,
-    onBlocked: () => render(),
-  });
+  const saver = persist
+    ? createProgressSaver({
+        store: localStorage,
+        tabId: TAB_ID,
+        locksApi,
+        events: window,
+        onBlocked: () => render(),
+      })
+    : null;
 
   function saveChips() {
     // 저장은 판 종료 시점에만 한다. 판 도중(베팅이 팟에 묶인 상태) 저장하면
     // 앱을 닫았다 열었을 때 진행 중이던 팟이 사라져 전체 칩이 새는 문제가 있다.
+    if (!saver) return;
     const snap = progressSnapshot(state);
     if (!snap) return;
     saver.save(snap);
@@ -91,15 +107,16 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
 
   function pump() {
     // AI 자리와 위임 중 내 자리를 자동 진행
-    if (busy) return;
+    if (busy || stopped) return;
     const step = () => {
+      if (stopped) return;
       let acted = false;
       if (state.phase === 'choose-reveal') {
         for (let i = 0; i < 4; i++) {
           if (i === 0 && !delegated) continue; // 위임 중이면 내 공개 패도 AI가 선택
           if (!state.revealPicked[i]) {
             chooseReveal(state, i, aiChooseReveal(state, i));
-            if (i >= 1) lines[i] = aiLine(i, 'reveal');
+            if (i >= 1) lines[i] = aiLine(i, 'reveal', Math.random, seatPersonality(state, i));
             acted = true;
             break;
           }
@@ -178,10 +195,11 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
       lineHand = state.handNumber;
     }
     if (state.phase === 'hand-over' && prevPhase !== 'hand-over') {
+      opts?.onHandOver?.(state);
       // 승부 결과에 맞춰 승자·패자 대사(제안 초안)
       for (let i = 1; i < 4; i++) {
-        if (state.winners.includes(i)) lines[i] = aiLine(i, 'win');
-        else if (!state.seats[i].folded) lines[i] = aiLine(i, 'lose');
+        if (state.winners.includes(i)) lines[i] = aiLine(i, 'win', Math.random, seatPersonality(state, i));
+        else if (!state.seats[i].folded) lines[i] = aiLine(i, 'lose', Math.random, seatPersonality(state, i));
       }
     }
     prevPhase = state.phase;
@@ -189,7 +207,7 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
     const myTurn = needsAction(state) === 'player';
     const legal = legalActions(state, 0);
     const toCall = state.currentBet - me.bet;
-    const unit = BET_UNITS[state.street];
+    const unit = state.betUnits[state.street];
 
     const streetLabel =
       state.phase === 'choose-reveal' ? '공개할 카드 선택'
@@ -201,7 +219,14 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
 
     const title = document.createElement('div');
     title.className = 'pk-title';
-    title.innerHTML = `<span>세븐포커2026 <small>자유 대국 · ${state.handNumber}번째 판</small></span>`;
+    title.innerHTML = `<span>세븐포커2026 <small>${opts?.title ?? '자유 대국'} · ${state.handNumber}번째 판</small></span>`;
+    if (opts?.onExit) {
+      const exit = document.createElement('button');
+      exit.className = 'pk-exit';
+      exit.textContent = '메뉴로';
+      exit.onclick = () => opts.onExit!();
+      title.appendChild(exit);
+    }
     el.appendChild(title);
 
     // Web Locks 미지원 브라우저: 시작부터 복수 탭 저장 보호 한계를 알린다.
@@ -214,7 +239,7 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
     }
 
     // 다른 탭이 더 앞선 진행을 저장 중이면 알림 (이 탭의 진행은 저장되지 않음)
-    if (saver.blocked) {
+    if (saver?.blocked) {
       const warn = document.createElement('div');
       warn.className = 'pk-last';
       warn.textContent = '다른 탭에서 저장된 진행이 있어 이 탭의 진행은 저장되지 않습니다. 새로고침하면 최신 진행을 이어갑니다.';
@@ -253,7 +278,8 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
       top.className = 'pk-opp-top';
       const ava = document.createElement('img');
       ava.className = 'pk-ava';
-      ava.src = AVATARS[i];
+      ava.src = s.avatar ?? AVATARS[i];
+      ava.onerror = () => ava.remove(); // 아바타 에셋이 없으면 이름만 표시
       ava.alt = s.name;
       top.appendChild(ava);
       const info = document.createElement('div');
@@ -480,7 +506,15 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
 
   render();
   pump();
-  return { el, render };
+  return {
+    el,
+    render,
+    state,
+    unmount: () => {
+      stopped = true;
+      el.remove();
+    },
+  };
 }
 
 // 저장된 진행(칩·판 번호)을 읽는다. 복원 적용은 createGame이 시작 전에 수행.
