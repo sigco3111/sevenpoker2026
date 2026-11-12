@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../src/engine/game';
-import { TOURNAMENT_STAGES, bindCharacters, stageOutcome } from '../src/tournament';
+import { TOURNAMENT_STAGES, bindCharacters, stageOutcome, stageIntroLines } from '../src/tournament';
 import { CHARACTERS } from '../src/characters';
 
 bindCharacters(CHARACTERS);
@@ -32,5 +32,20 @@ describe('토너먼트 스테이지 판정', () => {
     s.handNumber = 2;
     s.seats[0].chips = stage.ante - 1;
     expect(stageOutcome(s, stage)).toBe('fail');
+  });
+});
+
+describe('토너먼트 인트로 본문 판수', () => {
+  it('본문 판수가 각 스테이지 설정 hands와 일치하고 자리표시자가 남지 않는다', () => {
+    for (const st of TOURNAMENT_STAGES) {
+      const lines = stageIntroLines(st);
+      expect(lines.join(' ')).toContain(`${st.hands}판`);
+      expect(lines.join(' ')).not.toContain('{hands}');
+    }
+  });
+  it('설정 hands를 바꾸면 본문도 따라간다(회귀: 하드코딩 금지)', () => {
+    const custom = { ...TOURNAMENT_STAGES[0], hands: 2 };
+    expect(stageIntroLines(custom).join(' ')).toContain('2판을 치른 뒤');
+    expect(stageIntroLines(custom).join(' ')).not.toContain('8판');
   });
 });
