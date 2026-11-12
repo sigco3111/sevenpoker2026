@@ -27,6 +27,7 @@ function showMenu() {
       onFree: showFree,
       onStory: showChapterIntro,
       onTournament: showStageIntro,
+      onStoryReplay: showStoryReplay,
     }),
   );
 }
@@ -67,6 +68,24 @@ function startChapter(index: number) {
         if (outcome === 'clear') showChapterClear(index);
         else if (outcome === 'fail') showChapterFail(index);
       },
+    }),
+  );
+}
+
+// 전 챕터 클리어 후 스토리 타일: 챕터 재도전과 엔딩 재열람을 고른다.
+// 진행 저장은 바꾸지 않는다(재도전·클리어 판정 경로는 기존 그대로).
+function showStoryReplay() {
+  show(() =>
+      mountScene(app, {
+      kicker: '스토리 · 리조트 클럽의 초대',
+      title: '다시 보기',
+      illustration: STORY_CHAPTERS[STORY_CHAPTERS.length - 1].illustration,
+      lines: ['전 챕터를 클리어했습니다.', '다시 볼 챕터나 엔딩을 고르세요.'],
+      actions: [
+        ...STORY_CHAPTERS.map((c, i) => ({ label: c.title, primary: false, onClick: () => showChapterIntro(i) })),
+        { label: '엔딩 다시 보기', primary: false, onClick: () => showChapterClear(STORY_CHAPTERS.length - 1) },
+        { label: '메뉴로', primary: true, onClick: showMenu },
+      ],
     }),
   );
 }
