@@ -113,5 +113,18 @@ export function mountMenu(root: HTMLElement, story: StoryProgress, tour: Tournam
 
   el.appendChild(modes);
   root.appendChild(el);
+
+  // 아바타 프리로드: 대국 진입 때 이니셜 폴백이 수 초 보이는 지연을 줄이려고
+  // 메뉴 유휴 시간에 6종을 미리 내려받는다(브라우저 캐시가 반복 비용을 흡수).
+  const runPreload = () => {
+    for (let i = 1; i <= 6; i++) {
+      const im = new Image();
+      im.src = `avatars/avatar-${i}.png`;
+    }
+  };
+  const ric = (window as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
+  if (ric) ric(runPreload, { timeout: 3000 });
+  else setTimeout(runPreload, 1200);
+
   return { el, unmount: () => el.remove() };
 }
