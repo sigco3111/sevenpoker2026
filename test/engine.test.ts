@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Card, evaluate5, evaluate7, evaluate7Best, compareHandValue, compareUpcards, CATEGORY_NAME } from '../src/engine/cards';
-import { createGame, chooseReveal, applyAction, startHand, legalActions, progressSnapshot, ANTE } from '../src/engine/game';
+import { createGame, chooseReveal, applyAction, startHand, legalActions, progressSnapshot, canSaveProgress, ANTE } from '../src/engine/game';
 import { aiChooseReveal, aiTurn, aiLine } from '../src/engine/ai';
 
 const c = (rank: number, suit: Card['suit']): Card => ({ rank, suit });
@@ -341,6 +341,23 @@ describe('진행 저장·복원', () => {
     // 복원 후 새 판의 앤티 차감 전 칩이 저장 시점과 같아야 한다(판 번호는 +1)
     expect(g2.handNumber).toBe(snap.hands! + 1);
     expect(g2.seats.reduce((a, x) => a + x.chips, 0) + g2.pot).toBe(snap.chips!.reduce((a, b) => a + b, 0));
+  });
+
+  it('저장 소유권: 다른 탭의 같은 판 저장과 역행을 차단하고 이어쓰기는 허용', () => {
+    const snap = { chips: [1, 2, 3, 4], hands: 10 };
+    // 기록이 없으면 첫 저장 허용
+    expect(canSaveProgress(null, null, snap, 'tabA')).toBe(true);
+    // 내가 소유한 기록은 같은 판이라도 이어 쓸 수 있다
+    expect(canSaveProgress({ tabId: 'tabA', hands: 10 }, 10, snap, 'tabA')).toBe(true);
+    // 다른 탭이 같은 판을 먼저 저장했으면 차단 (같은 판 이중 종료 충돌)
+    expect(canSaveProgress({ tabId: 'tabB', hands: 10 }, 10, snap, 'tabA')).toBe(false);
+    // 다른 탭의 더 앞선 판은 차단 (역행)
+    expect(canSaveProgress({ tabId: 'tabB', hands: 11 }, 11, snap, 'tabA')).toBe(false);
+    // 다른 탭보다 앞선 판은 번호상 허용 (끈적 차단은 UI 계층의 saveBlocked가 담당)
+    expect(canSaveProgress({ tabId: 'tabB', hands: 9 }, 9, snap, 'tabA')).toBe(true);
+    // 소유권 기록이 없는 구형 저장: 번호 비교로 동일하게 동작
+    expect(canSaveProgress(null, 10, snap, 'tabA')).toBe(false);
+    expect(canSaveProgress(null, 9, snap, 'tabA')).toBe(true);
   });
 
   it('깨진 저장 값은 무시하고 기본값으로 시작', () => {
