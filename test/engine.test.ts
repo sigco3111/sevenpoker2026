@@ -242,7 +242,9 @@ describe('올인 팟 분리(메인팟·사이드팟) 정산', () => {
     // 구간1: 100x3=300 → 전원 자격, 최강 s1(스트레이트플러시). 구간2: 200x2=400 → s0,s2 중 s0(플러시)
     expect(deltas(g, before)).toEqual([400, 300, 0, 0]);
     expect(g.pot).toBe(0);
-    expect(g.winners).toEqual([1]); // 공개 연출은 전체 최강 패
+    expect(g.winners).toEqual([1, 0]); // 각 구간 실제 수상자 전원(구간1: s1, 구간2: s0)
+    expect(g.bestFive[1].length).toBe(5); // 각 수상자의 족보 5장
+    expect(g.bestFive[0].length).toBe(5);
   });
 
   it('다이한 사람의 기여금은 팟에 남지만 수상 자격은 없다', () => {
@@ -420,8 +422,8 @@ describe('승부 공개 표시 데이터(최적 5장·칩 증감)', () => {
     expect(g.resultText).toContain('승부 공개');
     expect(g.phase).toBe('hand-over');
     const w = g.winners[0];
-    expect(g.bestFive.length).toBe(5);
-    const five = g.bestFive.map((ci) => g.seats[w].cards[ci]);
+    expect(g.bestFive[w].length).toBe(5);
+    const five = g.bestFive[w].map((ci) => g.seats[w].cards[ci]);
     expect(compareHandValue(evaluate5(five), evaluate7(g.seats[w].cards))).toBe(0);
   });
 
@@ -444,3 +446,14 @@ describe('승부 공개 표시 데이터(최적 5장·칩 증감)', () => {
     expect(deltas.reduce((a, b) => a + b, 0)).toBe(0);
   });
 });
+
+  it('모두 다이로 끝난 판: 수상자만 표시되고 족보 공개는 없다(패 비공개)', () => {
+    const g = createGame(() => 0.5);
+    for (let i = 0; i < 4; i++) chooseReveal(g, i, 0);
+    let guard = 0;
+    while (g.phase !== 'hand-over' && guard++ < 10) applyAction(g, g.turn, 'fold');
+    expect(g.phase).toBe('hand-over');
+    expect(g.winners.length).toBe(1);
+    expect(Object.keys(g.bestFive).length).toBe(0);
+    expect(g.showdownRevealed).toBe(false);
+  });
