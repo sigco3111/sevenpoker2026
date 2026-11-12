@@ -51,3 +51,19 @@ describe('전 챕터 클리어 후 스토리 타일', () => {
     expect(storyIdx).toBe(1);
   });
 });
+
+describe('아바타 프리로드', () => {
+  it('메뉴 마운트 시 아바타 6종을 미리 요청한다', () => {
+    const srcs: string[] = [];
+    const OrigImage = (globalThis as { Image?: unknown }).Image;
+    (globalThis as { Image?: unknown }).Image = class {
+      set src(v: string) { srcs.push(v); }
+    };
+    (window as unknown as { requestIdleCallback: (cb: () => void) => number }).requestIdleCallback = (cb) => { cb(); return 0; };
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+    mountMenu(root, story, tour, { onFree: () => {}, onStory: () => {}, onTournament: () => {} });
+    expect(srcs.filter((s) => /avatars\/avatar-\d\.png/.test(s)).length).toBe(6);
+    (globalThis as { Image?: unknown }).Image = OrigImage;
+  });
+});
