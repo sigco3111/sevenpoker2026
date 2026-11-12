@@ -50,6 +50,12 @@ button { font: inherit; cursor: pointer; }
 .pk-opp.pk-active { box-shadow: 0 0 0 2px var(--yellow), 0 0 18px rgba(234,179,8,.5); background: rgba(234,179,8,.12); }
 .pk-opp.pk-folded { opacity: .5; }
 .pk-winner { box-shadow: 0 0 0 2px #ffd54a, 0 0 22px rgba(255,213,74,.65) !important; }
+.pk-card.pk-five { border-color: #eab308; box-shadow: 0 0 0 1.5px #ffd54a, 0 0 8px rgba(255,213,74,.8); }
+.pk-delta { font-weight: 700; margin-left: 3px; }
+.pk-delta.up { color: #ffd54a; }
+.pk-me-side .pk-delta.up { color: #b45309; }
+.pk-delta.down { color: #fca5a5; }
+.pk-me-side .pk-delta.down { color: #b91c1c; }
 .pk-line { min-height: 13px; font-size: 10px; line-height: 13px; color: #ffe9a8; text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* 중앙 덱 + 팟 */
