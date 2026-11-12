@@ -6,7 +6,7 @@ import { mountTable, loadProgress } from './ui/table';
 import { mountMenu } from './ui/menu';
 import { mountScene } from './ui/scene';
 import { STORY_CHAPTERS, loadStory, saveStory, judgeHand } from './story';
-import { TOURNAMENT_STAGES, bindCharacters, stageSeats, stageOutcome, loadTournament, saveTournament } from './tournament';
+import { TOURNAMENT_STAGES, bindCharacters, stageSeats, stageOutcome, loadTournament, saveTournament, stageIntroLines } from './tournament';
 import { CHARACTERS } from './characters';
 
 bindCharacters(CHARACTERS);
@@ -113,7 +113,7 @@ function showStageIntro(index: number) {
       kicker: '토너먼트 · 선셋 컵',
       title: `${stage.name} · ${stage.hands}판`,
       illustration: stage.image,
-      lines: [...stage.introLines, `상대: ${stage.opponents.map((c) => c.name).join(' · ')} / 시작 ${stage.startChips}칩 / 앤티 ${stage.ante}칩`],
+      lines: [...stageIntroLines(stage), `상대: ${stage.opponents.map((c) => c.name).join(' · ')} / 시작 ${stage.startChips}칩 / 앤티 ${stage.ante}칩`],
       actions: [
         { label: '대국 시작', primary: true, onClick: () => startStage(index) },
         { label: '메뉴로', onClick: showMenu },

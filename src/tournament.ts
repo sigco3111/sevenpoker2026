@@ -28,8 +28,9 @@ export const TOURNAMENT_STAGES: TournamentStage[] = [
     hands: 8,
     ante: 10,
     betUnits: [50, 50, 100, 100],
-    image: 'illust/story-ch1.png',
-    introLines: ['선셋 컵 예선이 시작됩니다.', '8판을 치른 뒤 칩이 가장 많으면 통과입니다.'],
+    // 아트 자산 4종 한정: 메뉴 타일(v5 시안)과 같은 매핑으로 스토리 챕터 아트와 구분
+    image: 'illust/story-ch2.png',
+    introLines: ['선셋 컵 예선이 시작됩니다.', '{hands}판을 치른 뒤 칩이 가장 많으면 통과입니다.'],
     clearLines: ['예선 통과! 준결승 테이블이 열렸습니다.'],
     failLines: ['아쉽게 탈락했습니다. 다시 도전해 보세요.'],
   },
@@ -41,8 +42,8 @@ export const TOURNAMENT_STAGES: TournamentStage[] = [
     hands: 8,
     ante: 20,
     betUnits: [100, 100, 200, 200],
-    image: 'illust/story-ch2.png',
-    introLines: ['준결승입니다. 판돈이 두 배로 커졌습니다.', '역시 8판, 1위만 결승에 갑니다.'],
+    image: 'illust/story-ch3.png',
+    introLines: ['준결승입니다. 판돈이 두 배로 커졌습니다.', '역시 {hands}판, 1위만 결승에 갑니다.'],
     clearLines: ['결승 진출! 마지막 테이블이 기다립니다.'],
     failLines: ['준결승에서 멈췄습니다. 한 번 더!'],
   },
@@ -54,8 +55,8 @@ export const TOURNAMENT_STAGES: TournamentStage[] = [
     hands: 10,
     ante: 30,
     betUnits: [150, 150, 300, 300],
-    image: 'illust/story-ch3.png',
-    introLines: ['선셋 컵 결승. 클럽의 강자들이 모였습니다.', '10판 뒤 1위가 우승 트로피를 가져갑니다.'],
+    image: 'illust/menu-hero.png',
+    introLines: ['선셋 컵 결승. 클럽의 강자들이 모였습니다.', '{hands}판 뒤 1위가 우승 트로피를 가져갑니다.'],
     clearLines: ['우승! 선셋 컵 챔피언입니다.'],
     failLines: ['준우승에 머물렀습니다. 결승에서 다시 도전하세요.'],
   },
@@ -71,6 +72,11 @@ export function bindCharacters(chars: Character[]): void {
   TOURNAMENT_STAGES[0].opponents = [by('haru'), by('miro'), by('rocky')];
   TOURNAMENT_STAGES[1].opponents = [by('seonu'), by('miro'), by('bolt')];
   TOURNAMENT_STAGES[2].opponents = [by('soyeon'), by('seonu'), by('bolt')];
+}
+
+// 인트로 문구의 {hands} 자리표시자를 실제 설정 판 수로 치환(본문 판수가 설정값을 따라가게 한다)
+export function stageIntroLines(stage: TournamentStage): string[] {
+  return stage.introLines.map((line) => line.replaceAll('{hands}', String(stage.hands)));
 }
 
 export function stageSeats(stage: TournamentStage): OpponentSpec[] {
