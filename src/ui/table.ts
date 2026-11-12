@@ -412,7 +412,7 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
       } else if (legal.includes('call')) {
         const call = document.createElement('button');
         call.className = 'pk-call';
-        call.textContent = `콜 ${toCall.toLocaleString()}`;
+        call.textContent = `콜 ${toCall.toLocaleString()}칩`; // 로그 '콜 N칩'·레이즈 버튼과 단위 표기 통일
         call.onclick = () => act('call');
         bar.appendChild(call);
       }
