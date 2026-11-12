@@ -1,7 +1,8 @@
 // 대국 화면 렌더링과 조작. 모바일 한 화면 구성(390x844) 우선.
 // 테이블 구성: 펠트 위 상대 3인 + 중앙 덱/팟, 아래 내 자리. 딜링·뒤집기 연출 포함.
 import { Card, rankLabel, SUIT_LABEL } from '../engine/cards';
-import { GameState, legalActions, needsAction, chooseReveal, applyAction, startHand, BET_UNITS, progressSnapshot, canSaveProgress, SaveOwner } from '../engine/game';
+import { GameState, legalActions, needsAction, chooseReveal, applyAction, startHand, BET_UNITS, progressSnapshot } from '../engine/game';
+import { writeProgress, readProgress } from '../engine/persist';
 import { aiChooseReveal, aiTurn, aiLine } from '../engine/ai';
 
 const AVATARS = ['', 'avatars/avatar-1.png', 'avatars/avatar-2.png', 'avatars/avatar-3.png'];
@@ -76,30 +77,37 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
     // 앱을 닫았다 열었을 때 진행 중이던 팟이 사라져 전체 칩이 새는 문제가 있다.
     const snap = progressSnapshot(state);
     if (!snap || saveBlocked) return;
-    try {
-      // 복수 탭 충돌 방지: 소유권 기록과 판 번호를 함께 본다.
-      // - 다른 탭이 같은 판을 먼저 저장했거나 더 앞선 판이면 차단
-      // - 이 탭이 소유한 기록 위에서 이어 쓰는 저장은 허용
-      const rawOwner = localStorage.getItem('sevenpoker2026.owner');
-      const owner: SaveOwner | null = rawOwner ? JSON.parse(rawOwner) : null;
-      const storedHandsRaw = localStorage.getItem('sevenpoker2026.hands');
-      const storedHands = storedHandsRaw == null ? null : Number(storedHandsRaw);
-      if (!canSaveProgress(owner, storedHands, snap, TAB_ID)) {
+    // 복수 탭 충돌 방지: 읽기-판정-쓰기를 Web Locks 임계 구역으로 직렬화해
+    // 같은 판 동시 종료·역행 저장을 한 탭만 통과시킨다.
+    const doSave = () => {
+      try {
+        const verdict = writeProgress(localStorage, snap, TAB_ID);
+        if (verdict === 'blocked-foreign') { saveBlocked = true; render(); }
+      } catch { /* 저장 실패는 무시 */ }
+    };
+    if (locksSupported) {
+      locksApi!.request('sevenpoker2026.save', doSave).catch(() => { /* 잠금 실패는 무시 */ });
+    } else {
+      // Web Locks 미지원: 직렬화를 보장할 수 없으므로, 다른 탭의 기록이 storage
+      // 이벤트로 보이는 순간 이 탭의 저장을 막는 보수적 차단을 켠 뒤 저장한다.
+      // 완전한 직렬화는 아니며, 이 한계를 안내 문구와 README에 명시한다.
+      armForeignWriteGuard();
+      doSave();
+    }
+  }
+
+  type LocksApi = { request: (name: string, cb: () => void) => Promise<unknown> };
+  const locksApi = (navigator as { locks?: LocksApi }).locks;
+  const locksSupported = !!(locksApi && typeof locksApi.request === 'function');
+  let foreignGuardArmed = false;
+  function armForeignWriteGuard() {
+    if (foreignGuardArmed) return;
+    foreignGuardArmed = true;
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'sevenpoker2026.save2' && !saveBlocked) {
         saveBlocked = true; render();
-        return;
       }
-      localStorage.setItem('sevenpoker2026.chips', JSON.stringify(snap.chips));
-      localStorage.setItem('sevenpoker2026.hands', String(snap.hands));
-      localStorage.setItem('sevenpoker2026.owner', JSON.stringify({ tabId: TAB_ID, hands: snap.hands }));
-      // 동시 종료 경쟁 후확인: 두 탭이 거의 동시에 검사를 통과하면 마지막 쓰기가 이긴다.
-      // 쓰기 직후 소유권을 다시 읽어 내 기록이 아니면 진 탭으로 간주하고 차단한다.
-      // 저장소는 한 탭의 온전한 기록으로 유지되고, 진 탭은 안내와 함께 멈춘다.
-      const confirmRaw = localStorage.getItem('sevenpoker2026.owner');
-      const confirmOwner: SaveOwner | null = confirmRaw ? JSON.parse(confirmRaw) : null;
-      if (!confirmOwner || confirmOwner.tabId !== TAB_ID) {
-        saveBlocked = true; render();
-      }
-    } catch { /* 저장 실패는 무시 */ }
+    });
   }
 
   function pump() {
@@ -472,15 +480,5 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
 
 // 저장된 진행(칩·판 번호)을 읽는다. 복원 적용은 createGame이 시작 전에 수행.
 export function loadProgress(): { chips?: number[]; hands?: number } {
-  try {
-    const raw = localStorage.getItem('sevenpoker2026.chips');
-    const chips = raw ? JSON.parse(raw) : undefined;
-    const hands = Number(localStorage.getItem('sevenpoker2026.hands'));
-    return {
-      chips: Array.isArray(chips) && chips.length === 4 && chips.every((n) => Number.isFinite(n) && n >= 0) ? chips : undefined,
-      hands: Number.isFinite(hands) && hands >= 0 ? hands : undefined,
-    };
-  } catch { /* 깨진 저장은 기본값 */
-    return {};
-  }
+  return readProgress(localStorage);
 }
