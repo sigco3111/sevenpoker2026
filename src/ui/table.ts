@@ -223,7 +223,7 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
     title.className = 'pk-title';
     const goal = opts?.goalChips;
     const remain = goal !== undefined ? goal - state.seats[0].chips : 0;
-    const goalText = goal !== undefined ? ` · 목표 ${goal}칩${remain > 0 ? `까지 ${remain}칩` : ' 달성'}` : '';
+    const goalText = goal !== undefined ? (remain > 0 ? ` · 목표까지 ${remain}칩` : ' · 목표 달성') : '';
     title.innerHTML = `<span>세븐포커2026 <small>${opts?.title ?? '자유 대국'} · ${state.handNumber}번째 판${goalText}</small></span>`;
     if (opts?.onExit) {
       const exit = document.createElement('button');
@@ -281,12 +281,20 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
         (state.phase === 'hand-over' && state.winners.includes(i) ? ' pk-winner' : '');
       const top = document.createElement('div');
       top.className = 'pk-opp-top';
+      // 아바타 + 이니셜 폴백: 이미지 로딩 중·실패 시에도 이름 첫 글자로 누구인지 식별 가능하게 한다.
+      const wrap = document.createElement('span');
+      wrap.className = 'pk-ava-wrap';
+      const fb = document.createElement('span');
+      fb.className = 'pk-ava-fallback';
+      fb.textContent = s.name.replace(/·.*/, '').trim().charAt(0) || s.name.charAt(0);
+      wrap.appendChild(fb);
       const ava = document.createElement('img');
       ava.className = 'pk-ava';
       ava.src = s.avatar ?? AVATARS[i];
-      ava.onerror = () => ava.remove(); // 아바타 에셋이 없으면 이름만 표시
+      ava.onerror = () => ava.remove(); // 로드 실패 시 이니셜 폴백이 남는다
       ava.alt = s.name;
-      top.appendChild(ava);
+      wrap.appendChild(ava);
+      top.appendChild(wrap);
       const info = document.createElement('div');
       info.className = 'pk-opp-info';
       info.innerHTML = `<span class="pk-name">${s.name}</span><span class="pk-chips">${s.chips.toLocaleString()}칩${deltaHtml(i, s.chips)}${s.folded ? ' · 다이' : ''}${!s.folded && s.chips === 0 && state.phase !== 'hand-over' ? ' · 올인' : ''}</span>`;
@@ -394,8 +402,7 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
     me.cards.forEach((c, ci) => {
       const target = me.revealed[ci] ? openRow : hidRow;
       const hole = !me.revealed[ci];
-      const wasVisible = prevVis[0][ci] === true;
-      const flip = ci < prevVis[0].length && prevCounts[0] >= me.cards.length && !wasVisible;
+      // 내 패에는 등장 플립 연출을 쓰지 않는다(사용자 요청: '나만 보는 패' 애니메이션 제거)
       if (picking) {
         const ce = cardEl(c, { big: true, hole, onPick: () => {
           chooseReveal(state, 0, ci);
@@ -405,7 +412,7 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
         cardEls[0][ci] = ce;
         target.appendChild(ce);
       } else {
-        const ce = cardEl(c, { big: true, hole, flip, flipDelay: flip && state.phase !== 'betting' ? flipSeq++ * 120 : 0, five: state.phase === 'hand-over' && (state.bestFive[0] ?? []).includes(ci) });
+        const ce = cardEl(c, { big: true, hole, five: state.phase === 'hand-over' && (state.bestFive[0] ?? []).includes(ci) });
         cardEls[0][ci] = ce;
         target.appendChild(ce);
       }
@@ -536,7 +543,8 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
     const newBySeat: { seat: number; els: HTMLElement[] }[] = [];
     state.seats.forEach((s, i) => {
       const grown = s.cards.length - prevCounts[i];
-      if (grown > 0) {
+      // 내 패(0번 자리)에는 딜링 비행 연출을 쓰지 않는다(사용자 요청). 상대 자리는 유지.
+      if (grown > 0 && i !== 0) {
         // 새로 받은 카드 index에 대응하는 요소를 정확히 선택 (공개/비공개 배치와 무관)
         const els = s.cards.map((_, ci) => cardEls[i][ci]).slice(-grown).filter((e): e is HTMLElement => !!e);
         if (els.length) newBySeat.push({ seat: i, els });
