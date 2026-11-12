@@ -49,6 +49,8 @@ button { font: inherit; cursor: pointer; }
 .pk-opp .pk-cards { display: flex; gap: 3px; flex-wrap: wrap; justify-content: center; max-width: 116px; min-height: 34px; }
 .pk-opp.pk-active { box-shadow: 0 0 0 2px var(--yellow), 0 0 18px rgba(234,179,8,.5); background: rgba(234,179,8,.12); }
 .pk-opp.pk-folded { opacity: .5; }
+.pk-winner { box-shadow: 0 0 0 2px #ffd54a, 0 0 22px rgba(255,213,74,.65) !important; }
+.pk-line { min-height: 13px; font-size: 10px; line-height: 13px; color: #ffe9a8; text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* 중앙 덱 + 팟 */
 .pk-center { position: absolute; left: 50%; top: 64%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 1; }
