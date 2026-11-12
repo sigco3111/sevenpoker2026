@@ -225,14 +225,15 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
       seat.appendChild(lineEl);
       const cards = document.createElement('div');
       cards.className = 'pk-cards';
-      const allShown = state.phase === 'showdown' || state.phase === 'hand-over';
+      // 승부 공개까지 간 판만, 생존한 자리만 전체 공개. 다이한 자리의 숨김 패와 다이 종료 판은 비공개 유지.
+      const allShown = (state.phase === 'showdown' || state.phase === 'hand-over') && state.showdownRevealed && !s.folded;
       const order = s.cards.map((c, ci) => ({ c, ci }))
         .sort((a, b) => Number(allShown || s.revealed[b.ci]) - Number(allShown || s.revealed[a.ci]));
       order.forEach(({ c, ci }) => {
         const visible = allShown || s.revealed[ci];
         const wasVisible = prevVis[i][ci] === true;
         const flip = visible && !wasVisible && prevCounts[i] >= s.cards.length;
-        const ce = cardEl(visible ? c : null, { mini: true, flip, flipDelay: flip && state.phase !== 'betting' ? flipSeq++ * 120 : 0, five: state.phase === 'hand-over' && state.winners.includes(i) && state.bestFive.includes(ci) });
+        const ce = cardEl(visible ? c : null, { mini: true, flip, flipDelay: flip && state.phase !== 'betting' ? flipSeq++ * 120 : 0, five: state.phase === 'hand-over' && (state.bestFive[i] ?? []).includes(ci) });
         cardEls[i][ci] = ce;
         cards.appendChild(ce);
       });
@@ -255,7 +256,8 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
     // 내 자리
     const meBox = document.createElement('div');
     meBox.className =
-      'pk-me' + (delegated ? ' pk-delegated' : '') + (state.phase === 'hand-over' && state.winners.includes(0) ? ' pk-winner' : '');
+      'pk-me' + (delegated ? ' pk-delegated' : '') + (state.phase === 'hand-over' && state.winners.includes(0) ? ' pk-winner' : '') +
+      (!delegated && state.phase === 'betting' && state.turn === 0 ? ' pk-active' : '');
     const head = document.createElement('div');
     head.className = 'pk-me-head';
     head.innerHTML = `<span class="pk-me-name">나${delegated ? ' · <span class="pk-badge">위임 중</span>' : ''}${me.folded ? ' · 다이' : ''}</span>`;
@@ -304,7 +306,7 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
         cardEls[0][ci] = ce;
         target.appendChild(ce);
       } else {
-        const ce = cardEl(c, { big: true, flip, flipDelay: flip && state.phase !== 'betting' ? flipSeq++ * 120 : 0, five: state.phase === 'hand-over' && state.winners.includes(0) && state.bestFive.includes(ci) });
+        const ce = cardEl(c, { big: true, flip, flipDelay: flip && state.phase !== 'betting' ? flipSeq++ * 120 : 0, five: state.phase === 'hand-over' && (state.bestFive[0] ?? []).includes(ci) });
         cardEls[0][ci] = ce;
         target.appendChild(ce);
       }
