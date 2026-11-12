@@ -361,6 +361,16 @@ export function progressSnapshot(state: GameState): SavedProgress | null {
   return { chips: state.seats.map((s) => s.chips), hands: state.handNumber };
 }
 
+// 저장 소유권: 탭마다 무작위 tabId를 만들고, 저장 시 {tabId, hands}를 함께 기록한다.
+// 다른 탭이 같은 판을 먼저 저장했거나 더 앞선 판을 저장했으면 이 탭의 저장은 차단한다.
+export interface SaveOwner { tabId: string; hands: number }
+export function canSaveProgress(owner: SaveOwner | null, storedHands: number | null, snap: SavedProgress, tabId: string): boolean {
+  if (owner && owner.tabId === tabId) return true; // 이 탭이 이어 쓰는 저장
+  const base = owner ? owner.hands : storedHands;
+  if (base == null || !Number.isFinite(base)) return true; // 기록이 없으면 첫 저장
+  return (snap.hands ?? 0) > base; // 같은 판 이중 종료·역행 모두 차단
+}
+
 // UI 편의: 내 차례인지, AI 자동 진행이 필요한지
 export function needsAction(state: GameState): 'player' | 'ai' | 'none' {
   if (state.phase === 'choose-reveal') {
