@@ -114,3 +114,5 @@ button { font: inherit; cursor: pointer; }
 .pk-result { text-align: center; font-size: 13px; font-weight: 700; background: #fef3c7; border: 1px solid var(--yellow); border-radius: 10px; padding: 10px; margin-top: 8px; }
 .pk-log { font-size: 11px; color: var(--muted); padding: 6px 2px 0; min-height: 20px; line-height: 1.35; }
 .pk-log div:not(:last-child) { opacity: .6; }
+.pk-hand { font-size: 11px; font-weight: 700; color: #ffd54a; text-align: center; margin-top: 2px; text-shadow: 0 1px 2px rgba(0,0,0,.45); }
+.pk-me .pk-hand { color: #a06a00; text-shadow: none; }
