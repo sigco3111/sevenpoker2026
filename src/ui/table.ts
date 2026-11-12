@@ -6,7 +6,7 @@ import { aiChooseReveal, aiTurn, aiLine } from '../engine/ai';
 
 const AVATARS = ['', 'avatars/avatar-1.png', 'avatars/avatar-2.png', 'avatars/avatar-3.png'];
 const AI_DELAY = 650;
-const NEXT_HAND_DELAY = 2500; // 위임 중 결과를 읽을 시간
+const NEXT_HAND_DELAY = 3500; // 위임 중 결과를 읽을 시간 (순차 뒤집기 완료 후 여유)
 const FLY_MS = 550; // 딜링 비행 시간
 
 export interface UI {
@@ -30,9 +30,9 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
   let lineHand = 0;
   let prevPhase = '';
 
-  function cardEl(card: Card | null, opts: { big?: boolean; mini?: boolean; pickable?: boolean; flip?: boolean; flipDelay?: number; onPick?: () => void } = {}) {
+  function cardEl(card: Card | null, opts: { big?: boolean; mini?: boolean; pickable?: boolean; flip?: boolean; flipDelay?: number; five?: boolean; onPick?: () => void } = {}) {
     const d = document.createElement(opts.onPick ? 'button' : 'div');
-    d.className = 'pk-card' + (opts.big ? ' big' : '') + (opts.mini ? ' mini' : '') + (opts.onPick ? ' pickable' : '') + (opts.flip ? ' pk-flipin' : '');
+    d.className = 'pk-card' + (opts.big ? ' big' : '') + (opts.mini ? ' mini' : '') + (opts.onPick ? ' pickable' : '') + (opts.flip ? ' pk-flipin' : '') + (opts.five ? ' pk-five' : '');
     if (opts.flip && opts.flipDelay) d.style.animationDelay = `${opts.flipDelay}ms`;
     if (!card) {
       d.classList.add('back');
@@ -45,6 +45,16 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
     d.setAttribute('aria-label', `${rankLabel(card.rank)} ${SUIT_LABEL[card.suit]}`);
     if (opts.onPick) (d as HTMLButtonElement).onclick = opts.onPick;
     return d;
+  }
+
+  // 판 종료 시 칩 증감(베팅·수상·미콜 반환을 합산한 순변화)
+  function deltaHtml(i: number, chips: number): string {
+    if (state.phase !== 'hand-over') return '';
+    const start = state.handStartChips?.[i];
+    if (start === undefined) return '';
+    const d = chips - start;
+    if (d === 0) return '';
+    return ` <span class="pk-delta ${d > 0 ? 'up' : 'down'}">${d > 0 ? '+' : ''}${d.toLocaleString()}</span>`;
   }
 
   function act(action: 'fold' | 'check' | 'call' | 'raise') {
@@ -206,7 +216,7 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
       top.appendChild(ava);
       const info = document.createElement('div');
       info.className = 'pk-opp-info';
-      info.innerHTML = `<span class="pk-name">${s.name}</span><span class="pk-chips">${s.chips.toLocaleString()}칩${s.folded ? ' · 다이' : ''}</span>`;
+      info.innerHTML = `<span class="pk-name">${s.name}</span><span class="pk-chips">${s.chips.toLocaleString()}칩${deltaHtml(i, s.chips)}${s.folded ? ' · 다이' : ''}</span>`;
       top.appendChild(info);
       seat.appendChild(top);
       const lineEl = document.createElement('div');
@@ -222,7 +232,7 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
         const visible = allShown || s.revealed[ci];
         const wasVisible = prevVis[i][ci] === true;
         const flip = visible && !wasVisible && prevCounts[i] >= s.cards.length;
-        const ce = cardEl(visible ? c : null, { mini: true, flip, flipDelay: flip && state.phase !== 'betting' ? flipSeq++ * 120 : 0 });
+        const ce = cardEl(visible ? c : null, { mini: true, flip, flipDelay: flip && state.phase !== 'betting' ? flipSeq++ * 120 : 0, five: state.phase === 'hand-over' && state.winners.includes(i) && state.bestFive.includes(ci) });
         cardEls[i][ci] = ce;
         cards.appendChild(ce);
       });
@@ -251,7 +261,7 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
     head.innerHTML = `<span class="pk-me-name">나${delegated ? ' · <span class="pk-badge">위임 중</span>' : ''}${me.folded ? ' · 다이' : ''}</span>`;
     const side = document.createElement('div');
     side.className = 'pk-me-side';
-    side.innerHTML = `<span>${me.chips.toLocaleString()}칩</span>`;
+    side.innerHTML = `<span>${me.chips.toLocaleString()}칩${deltaHtml(0, me.chips)}</span>`;
     if (!delegated && (state.phase === 'betting' || state.phase === 'choose-reveal')) {
       const d = document.createElement('button');
       d.className = 'pk-delegate';
@@ -294,7 +304,7 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
         cardEls[0][ci] = ce;
         target.appendChild(ce);
       } else {
-        const ce = cardEl(c, { big: true, flip, flipDelay: flip && state.phase !== 'betting' ? flipSeq++ * 120 : 0 });
+        const ce = cardEl(c, { big: true, flip, flipDelay: flip && state.phase !== 'betting' ? flipSeq++ * 120 : 0, five: state.phase === 'hand-over' && state.winners.includes(0) && state.bestFive.includes(ci) });
         cardEls[0][ci] = ce;
         target.appendChild(ce);
       }
