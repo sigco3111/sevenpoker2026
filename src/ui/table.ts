@@ -1,7 +1,7 @@
 // 대국 화면 렌더링과 조작. 모바일 한 화면 구성(390x844) 우선.
 // 테이블 구성: 펠트 위 상대 3인 + 중앙 덱/팟, 아래 내 자리. 딜링·뒤집기 연출 포함.
 import { Card, rankLabel, SUIT_LABEL } from '../engine/cards';
-import { GameState, legalActions, needsAction, chooseReveal, applyAction, startHand, BET_UNITS, progressSnapshot } from '../engine/game';
+import { GameState, legalActions, needsAction, chooseReveal, applyAction, startHand, BET_UNITS, progressSnapshot, canSaveProgress, SaveOwner } from '../engine/game';
 import { aiChooseReveal, aiTurn, aiLine } from '../engine/ai';
 
 const AVATARS = ['', 'avatars/avatar-1.png', 'avatars/avatar-2.png', 'avatars/avatar-3.png'];
@@ -65,24 +65,32 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
     pump();
   }
 
-  // 다른 탭이 더 앞선 진행을 저장해 두었으면 true. 이 탭의 진행은 덮어쓰지 않는다.
+  // 이 탭의 저장 소유권 id. 페이지를 열 때마다 새로 만든다.
+  const TAB_ID = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  // 다른 탭의 저장과 한 번이라도 충돌하면 true. 차단된 탭은 이후 판을 더 진행해도
+  // 저장하지 않는다(따라잡은 뒤 덮어쓰는 것도 막기 위해). 새로고침하면 최신 진행을 이어간다.
   let saveBlocked = false;
 
   function saveChips() {
     // 저장은 판 종료 시점에만 한다. 판 도중(베팅이 팟에 묶인 상태) 저장하면
     // 앱을 닫았다 열었을 때 진행 중이던 팟이 사라져 전체 칩이 새는 문제가 있다.
     const snap = progressSnapshot(state);
-    if (!snap) return;
+    if (!snap || saveBlocked) return;
     try {
-      // 두 탭에서 열었을 때: 더 앞선 판 번호의 저장을 뒤처진 탭이 덮어쓰지 않게 막는다.
-      const storedHands = Number(localStorage.getItem('sevenpoker2026.hands'));
-      if (Number.isFinite(storedHands) && (snap.hands ?? 0) < storedHands) {
-        if (!saveBlocked) { saveBlocked = true; render(); }
+      // 복수 탭 충돌 방지: 소유권 기록과 판 번호를 함께 본다.
+      // - 다른 탭이 같은 판을 먼저 저장했거나 더 앞선 판이면 차단
+      // - 이 탭이 소유한 기록 위에서 이어 쓰는 저장은 허용
+      const rawOwner = localStorage.getItem('sevenpoker2026.owner');
+      const owner: SaveOwner | null = rawOwner ? JSON.parse(rawOwner) : null;
+      const storedHandsRaw = localStorage.getItem('sevenpoker2026.hands');
+      const storedHands = storedHandsRaw == null ? null : Number(storedHandsRaw);
+      if (!canSaveProgress(owner, storedHands, snap, TAB_ID)) {
+        saveBlocked = true; render();
         return;
       }
       localStorage.setItem('sevenpoker2026.chips', JSON.stringify(snap.chips));
       localStorage.setItem('sevenpoker2026.hands', String(snap.hands));
-      if (saveBlocked) { saveBlocked = false; render(); }
+      localStorage.setItem('sevenpoker2026.owner', JSON.stringify({ tabId: TAB_ID, hands: snap.hands }));
     } catch { /* 저장 실패는 무시 */ }
   }
 
@@ -205,7 +213,7 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
     if (saveBlocked) {
       const warn = document.createElement('div');
       warn.className = 'pk-last';
-      warn.textContent = '다른 탭에서 더 앞선 진행이 저장되어 있어, 이 탭의 진행은 저장되지 않습니다. 새로고침하면 최신 진행을 이어갑니다.';
+      warn.textContent = '다른 탭에서 저장된 진행이 있어 이 탭의 진행은 저장되지 않습니다. 새로고침하면 최신 진행을 이어갑니다.';
       el.appendChild(warn);
     }
 
