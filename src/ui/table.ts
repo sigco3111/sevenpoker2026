@@ -26,6 +26,7 @@ export interface TableOptions {
 
 export function mountTable(root: HTMLElement, state: GameState, opts?: TableOptions): UI {
   const el = document.createElement('div');
+  el.className = 'pk-table';
   root.appendChild(el);
   const persist = opts?.persist !== false;
 
@@ -42,9 +43,9 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
   let lineHand = 0;
   let prevPhase = '';
 
-  function cardEl(card: Card | null, opts: { big?: boolean; mini?: boolean; pickable?: boolean; flip?: boolean; flipDelay?: number; five?: boolean; onPick?: () => void } = {}) {
+  function cardEl(card: Card | null, opts: { big?: boolean; mini?: boolean; mid?: boolean; hole?: boolean; pickable?: boolean; flip?: boolean; flipDelay?: number; five?: boolean; onPick?: () => void } = {}) {
     const d = document.createElement(opts.onPick ? 'button' : 'div');
-    d.className = 'pk-card' + (opts.big ? ' big' : '') + (opts.mini ? ' mini' : '') + (opts.onPick ? ' pickable' : '') + (opts.flip ? ' pk-flipin' : '') + (opts.five ? ' pk-five' : '');
+    d.className = 'pk-card' + (opts.big ? ' big' : '') + (opts.mini ? ' mini' : '') + (opts.mid ? ' mid' : '') + (opts.hole ? ' pk-hole' : '') + (opts.onPick ? ' pickable' : '') + (opts.flip ? ' pk-flipin' : '') + (opts.five ? ' pk-five' : '');
     if (opts.flip && opts.flipDelay) d.style.animationDelay = `${opts.flipDelay}ms`;
     if (!card) {
       d.classList.add('back');
@@ -301,7 +302,7 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
         const visible = allShown || s.revealed[ci];
         const wasVisible = prevVis[i][ci] === true;
         const flip = visible && !wasVisible && prevCounts[i] >= s.cards.length;
-        const ce = cardEl(visible ? c : null, { mini: true, flip, flipDelay: flip && state.phase !== 'betting' ? flipSeq++ * 120 : 0, five: state.phase === 'hand-over' && (state.bestFive[i] ?? []).includes(ci) });
+        const ce = cardEl(visible ? c : null, { mid: true, flip, flipDelay: flip && state.phase !== 'betting' ? flipSeq++ * 120 : 0, five: state.phase === 'hand-over' && (state.bestFive[i] ?? []).includes(ci) });
         cardEls[i][ci] = ce;
         cards.appendChild(ce);
       });
@@ -325,6 +326,16 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
     const potbar = document.createElement('div');
     potbar.className = 'pk-potbar';
     potbar.innerHTML = `<span>${streetLabel}</span><span>팟 <strong>${state.pot.toLocaleString()}칩</strong></span>`;
+    // 스트리트 진행 점(3~7번째 카드): 현재 위치 인지용. 중앙 여백에 상태 정보만 추가
+    const streetIdx = state.phase === 'choose-reveal' ? 0 : Math.max(0, Math.min(4, state.street + 1));
+    const dots = document.createElement('div');
+    dots.className = 'pk-street-dots';
+    for (let i = 0; i < 5; i++) {
+      const d = document.createElement('i');
+      if (i <= streetIdx) d.className = 'on';
+      dots.appendChild(d);
+    }
+    potbar.appendChild(dots);
     center.appendChild(potbar);
     felt.appendChild(center);
 
@@ -370,10 +381,11 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
     const picking = state.phase === 'choose-reveal' && !state.revealPicked[0] && !delegated;
     me.cards.forEach((c, ci) => {
       const target = me.revealed[ci] ? openRow : hidRow;
+      const hole = !me.revealed[ci];
       const wasVisible = prevVis[0][ci] === true;
       const flip = ci < prevVis[0].length && prevCounts[0] >= me.cards.length && !wasVisible;
       if (picking) {
-        const ce = cardEl(c, { big: true, onPick: () => {
+        const ce = cardEl(c, { big: true, hole, onPick: () => {
           chooseReveal(state, 0, ci);
           render();
           pump();
@@ -381,28 +393,43 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
         cardEls[0][ci] = ce;
         target.appendChild(ce);
       } else {
-        const ce = cardEl(c, { big: true, flip, flipDelay: flip && state.phase !== 'betting' ? flipSeq++ * 120 : 0, five: state.phase === 'hand-over' && (state.bestFive[0] ?? []).includes(ci) });
+        const ce = cardEl(c, { big: true, hole, flip, flipDelay: flip && state.phase !== 'betting' ? flipSeq++ * 120 : 0, five: state.phase === 'hand-over' && (state.bestFive[0] ?? []).includes(ci) });
         cardEls[0][ci] = ce;
         target.appendChild(ce);
       }
     });
     openCol.appendChild(openRow);
     hidCol.appendChild(hidRow);
-    cardsWrap.appendChild(openCol);
-    const divider = document.createElement('div');
-    divider.className = 'pk-divider';
-    cardsWrap.appendChild(divider);
-    cardsWrap.appendChild(hidCol);
+    const hasOpen = openRow.childElementCount > 0;
+    const hasHid = hidRow.childElementCount > 0;
+    if (hasOpen) cardsWrap.appendChild(openCol);
+    if (hasOpen && hasHid) {
+      const divider = document.createElement('div');
+      divider.className = 'pk-divider';
+      cardsWrap.appendChild(divider);
+    }
+    if (hasHid) cardsWrap.appendChild(hidCol);
     meBox.appendChild(cardsWrap);
+
+    // 베팅 안내: 콜 금액과 콜 후 팟 (엔진 정의: pot은 지불 즉시 합산, 콜 = currentBet - 내 기여금)
+    if (state.phase === 'betting' && !me.folded && toCall > 0) {
+      const bl = document.createElement('div');
+      bl.className = 'pk-betline';
+      bl.innerHTML = `내 콜 <b>${toCall.toLocaleString()}칩</b> · 콜하면 팟 <b>${(state.pot + toCall).toLocaleString()}칩</b>`;
+      meBox.appendChild(bl);
+    }
     if ((state.phase === 'showdown' || state.phase === 'hand-over') && state.showdownRevealed && !me.folded && state.handNames[0]) {
       const hn = document.createElement('div');
       hn.className = 'pk-hand';
       hn.textContent = state.handNames[0];
       meBox.appendChild(hn);
     }
-    el.appendChild(meBox);
+    felt.appendChild(meBox);
 
-    // 조작 영역
+    // 조작 영역: 하단 월넛 밴드
+    const band = document.createElement('div');
+    band.className = 'pk-actions-band';
+    let bandUsed = false;
     if (delegated) {
       const note = document.createElement('div');
       note.className = 'pk-delegated-note';
@@ -415,7 +442,8 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
         delegated = false;
         render();
       };
-      el.appendChild(back);
+      band.appendChild(back);
+      bandUsed = true;
     } else if (state.phase === 'choose-reveal') {
       const hint = document.createElement('div');
       hint.className = 'pk-hint';
@@ -453,7 +481,8 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
         raise.onclick = () => act('raise');
         bar.appendChild(raise);
       }
-      el.appendChild(bar);
+      band.appendChild(bar);
+      bandUsed = true;
     }
 
     if (state.phase === 'hand-over') {
@@ -474,9 +503,11 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
           pump();
         };
         bar.appendChild(next);
-        el.appendChild(bar);
+        band.appendChild(bar);
+        bandUsed = true;
       }
     }
+    if (bandUsed) el.appendChild(band);
 
     // 최근 로그 한 줄
     const log = document.createElement('div');
