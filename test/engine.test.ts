@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Card, evaluate7, compareHandValue, compareUpcards, CATEGORY_NAME } from '../src/engine/cards';
 import { createGame, chooseReveal, applyAction, startHand, legalActions, ANTE } from '../src/engine/game';
-import { aiChooseReveal } from '../src/engine/ai';
+import { aiChooseReveal, aiTurn, aiLine } from '../src/engine/ai';
 
 const c = (rank: number, suit: Card['suit']): Card => ({ rank, suit });
 
@@ -319,5 +319,70 @@ describe('진행 저장·복원', () => {
     const g = createGame(() => 0.5, { chips: [-5, 1, 2] as unknown as number[], hands: -3 });
     expect(g.seats[0].chips).toBe(1500 - ANTE);
     expect(g.handNumber).toBe(1);
+  });
+});
+
+describe('AI 성향·정보 위생', () => {
+  // 결정론적 난수(LCG): 재현 가능한 시뮬레이션용
+  const lcg = (seed: number) => () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+
+  it('AI는 상대 히든 패를 보지 않는다: 히든 패를 바꿔도 같은 결정', () => {
+    // 시드 여러 개로 만든 실제 대국 상태에서, 결정 자리 외 좌석의
+    // 비공개 카드만 다른 카드로 바꿔도 aiTurn의 행동이 같아야 한다.
+    for (const seed of [7, 42, 1337]) {
+      const g = createGame(lcg(seed));
+      for (let i = 0; i < 4; i++) chooseReveal(g, i, aiChooseReveal(g, i));
+      // 베팅 단계의 각 AI 차례마다 검사
+      let guard = 0;
+      while (g.phase === 'betting' && guard++ < 50) {
+        const seat = g.turn;
+        const before = aiTurn(g, seat, lcg(seed * 10 + guard)).action;
+        // 다른 좌석의 히든(비공개) 카드만 바꿔침 — 공개 정보는 그대로
+        for (let i = 0; i < 4; i++) {
+          if (i === seat) continue;
+          const s = g.seats[i];
+          s.cards = s.cards.map((card, ci) => (s.revealed[ci] ? card : { rank: ((card.rank + 4) % 13) + 2, suit: card.suit }));
+        }
+        const after = aiTurn(g, seat, lcg(seed * 10 + guard)).action;
+        expect(after).toBe(before);
+        applyAction(g, seat, before, lcg(seed + guard));
+      }
+    }
+  });
+
+  it('성향별 장기 통계: 연륜(신중)이 가장 많이 다이, 직관(공격)이 가장 많이 레이즈', () => {
+    const rng = lcg(20261112);
+    const g = createGame(rng);
+    const cnt = [0, 1, 2, 3].map(() => ({ fold: 0, raise: 0, call: 0, check: 0, total: 0 }));
+    for (let h = 0; h < 1500; h++) {
+      let guard = 0;
+      while (g.phase !== 'hand-over' && guard++ < 2000) {
+        if (g.phase === 'choose-reveal') {
+          for (let i = 0; i < 4; i++) if (!g.revealPicked[i]) chooseReveal(g, i, aiChooseReveal(g, i));
+        } else if (g.phase === 'betting') {
+          const seat = g.turn;
+          const { action } = aiTurn(g, seat, rng);
+          cnt[seat][action] += 1;
+          cnt[seat].total += 1;
+          applyAction(g, seat, action, rng);
+        } else break;
+      }
+      startHand(g, rng);
+    }
+    const rate = (i: number, k: 'fold' | 'raise') => cnt[i][k] / cnt[i].total;
+    // seat1=연륜(tight), seat2=관찰(balanced), seat3=직관(loose)
+    expect(cnt[1].total).toBeGreaterThan(500);
+    expect(rate(1, 'fold')).toBeGreaterThan(rate(2, 'fold')); // 신중이 균형보다 더 다이
+    expect(rate(2, 'fold')).toBeGreaterThan(rate(3, 'fold')); // 균형이 공격보다 더 다이
+    expect(rate(3, 'raise')).toBeGreaterThan(rate(2, 'raise')); // 공격이 균형보다 더 레이즈
+    expect(rate(2, 'raise')).toBeGreaterThan(rate(1, 'raise')); // 균형이 신중보다 더 레이즈
+  });
+
+  it('대사 초안: 각 성향·상황에 빈칸 없는 한 줄이 있다', () => {
+    for (const seat of [1, 2, 3]) {
+      for (const sit of ['reveal', 'raise', 'bluff', 'fold', 'call', 'win', 'lose'] as const) {
+        expect(aiLine(seat, sit, () => 0).length).toBeGreaterThan(0);
+      }
+    }
   });
 });
