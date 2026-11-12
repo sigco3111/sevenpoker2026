@@ -13,13 +13,13 @@ describe('스토리 목표 진행 표시', () => {
     const ui = mountTable(document.getElementById('app')!, state, { title: ch.title, goalChips: ch.goalChips, persist: false });
     const t = () => document.querySelector('.pk-title')!.textContent!;
     expect(t()).toContain('1장');
-    expect(t()).toContain('목표 2000칩까지 510칩'); // 1500 시작 - 앤티 10 납부 후
+    expect(t()).toContain('목표까지 510칩'); // 1500 시작 - 앤티 10 납부 후
     state.seats[0].chips = 1800;
     ui.render();
-    expect(t()).toContain('목표 2000칩까지 200칩');
+    expect(t()).toContain('목표까지 200칩');
     state.seats[0].chips = 2050;
     ui.render();
-    expect(t()).toContain('목표 2000칩 달성');
+    expect(t()).toContain('목표 달성');
     ui.unmount();
   });
 
