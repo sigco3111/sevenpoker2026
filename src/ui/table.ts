@@ -407,7 +407,12 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
     // 최근 로그 한 줄
     const log = document.createElement('div');
     log.className = 'pk-log';
-    log.textContent = state.log.length ? state.log[state.log.length - 1].text : '';
+    // 최근 3줄: 칩 재지급·승부 공개 같은 알림이 바로 다음 한 줄에 묻히지 않게 한다
+    for (const entry of state.log.slice(-3)) {
+      const d = document.createElement('div');
+      d.textContent = entry.text;
+      log.appendChild(d);
+    }
     el.appendChild(log);
 
     // 딜링 연출: 새로 늘어난 카드들을 덱에서 날려 보냄
