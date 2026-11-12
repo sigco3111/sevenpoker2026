@@ -28,3 +28,26 @@ describe('메뉴 화면 마운트', () => {
     expect(root.textContent).toContain('t');
   });
 });
+
+describe('전 챕터 클리어 후 스토리 타일', () => {
+  it('클리어 상태면 다시 보기 핸들러로 간다', () => {
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+    let replay = 0, storyIdx = -1;
+    mountMenu(root, { v: 1, unlocked: 3 }, tour, { onFree: () => {}, onStory: (i) => { storyIdx = i; }, onTournament: () => {}, onStoryReplay: () => { replay++; } });
+    expect(root.textContent).toContain('전 챕터 클리어');
+    const tile = [...root.querySelectorAll('.pk-mode')].find((b) => b.textContent!.includes('스토리')) as HTMLButtonElement;
+    tile.click();
+    expect(replay).toBe(1);
+    expect(storyIdx).toBe(-1); // 진행 저장·재도전 경로 불변: 바로 챕터로 가지 않는다
+  });
+  it('미클리어 상태면 기존처럼 도전 챕터로 간다', () => {
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+    let storyIdx = -1;
+    mountMenu(root, { v: 1, unlocked: 1 }, tour, { onFree: () => {}, onStory: (i) => { storyIdx = i; }, onTournament: () => {}, onStoryReplay: () => { throw new Error('호출되면 안 됨'); } });
+    const tile = [...root.querySelectorAll('.pk-mode')].find((b) => b.textContent!.includes('스토리')) as HTMLButtonElement;
+    tile.click();
+    expect(storyIdx).toBe(1);
+  });
+});
