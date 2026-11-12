@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Card, evaluate5, evaluate7, evaluate7Best, compareHandValue, compareUpcards, CATEGORY_NAME } from '../src/engine/cards';
-import { createGame, chooseReveal, applyAction, startHand, legalActions, ANTE } from '../src/engine/game';
+import { createGame, chooseReveal, applyAction, startHand, legalActions, progressSnapshot, ANTE } from '../src/engine/game';
 import { aiChooseReveal, aiTurn, aiLine } from '../src/engine/ai';
 
 const c = (rank: number, suit: Card['suit']): Card => ({ rank, suit });
@@ -315,6 +315,32 @@ describe('진행 저장·복원', () => {
   it('판 번호도 복원되어 다음 번호부터 시작', () => {
     const g = createGame(() => 0.5, { chips: [1500, 1500, 1500, 1500], hands: 41 });
     expect(g.handNumber).toBe(42);
+  });
+
+  it('저장 스냅샷은 판 종료 시점에만 만들어진다(중도 저장 금지 회귀)', () => {
+    const g = createGame(() => 0.5);
+    expect(progressSnapshot(g)).toBeNull(); // 공개 선택 단계
+    for (let i = 0; i < 4; i++) chooseReveal(g, i, 0);
+    expect(progressSnapshot(g)).toBeNull(); // 베팅 단계
+    let guard = 0;
+    while (g.phase !== 'hand-over' && guard++ < 10) applyAction(g, g.turn, 'fold');
+    expect(g.phase).toBe('hand-over');
+    const snap = progressSnapshot(g);
+    expect(snap).not.toBeNull();
+    expect(snap!.hands).toBe(g.handNumber);
+    expect(snap!.chips).toEqual(g.seats.map((x) => x.chips));
+  });
+
+  it('스냅샷 복원 회귀: 저장된 판 종료 상태가 다음 판 시작 상태와 일치', () => {
+    const g = createGame(() => 0.5);
+    for (let i = 0; i < 4; i++) chooseReveal(g, i, 0);
+    let guard = 0;
+    while (g.phase !== 'hand-over' && guard++ < 10) applyAction(g, g.turn, 'fold');
+    const snap = progressSnapshot(g)!;
+    const g2 = createGame(() => 0.5, snap);
+    // 복원 후 새 판의 앤티 차감 전 칩이 저장 시점과 같아야 한다(판 번호는 +1)
+    expect(g2.handNumber).toBe(snap.hands! + 1);
+    expect(g2.seats.reduce((a, x) => a + x.chips, 0) + g2.pot).toBe(snap.chips!.reduce((a, b) => a + b, 0));
   });
 
   it('깨진 저장 값은 무시하고 기본값으로 시작', () => {
