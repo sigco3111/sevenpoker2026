@@ -180,6 +180,68 @@ describe('게임 진행', () => {
     }
     expect(raiseStates).toBeGreaterThan(200); // 표본 충분성
   });
+
+  // 4구 베팅 상태를 원하는 턴 순서로 직접 구성하는 헬퍼(통제 경로용)
+  const forceBetting = (turn: number) => {
+    const g = createGame(() => 0.5);
+    g.phase = 'betting';
+    g.street = 0;
+    g.currentBet = 0;
+    g.raisesUsed = 0;
+    for (const s of g.seats) { s.bet = 0; }
+    g.acted = [false, false, false, false];
+    g.turn = turn;
+    return g;
+  };
+
+  it('통제 경로: 오픈 베팅도 레이즈 1회를 쓰므로, 콜한 뒤 리레이즈된 자리에는 레이즈 버튼이 뜨지 않는다', () => {
+    // 질문받은 경로: 다른 자리 오픈 → 내 콜(s.bet>0) → 뒤 자리 레이즈 → 내 차례.
+    // 이 엔진에는 별도 '베팅' 액션이 없고 오픈 자체가 raise라 raisesUsed를 1 소진한다.
+    // 따라서 내 차례가 다시 오는 시점에는 raisesUsed === 2라 버튼 자체가 비활성이다.
+    const g = forceBetting(3); // seat3 오픈
+    applyAction(g, 3, 'raise'); // 오픈 베팅 = 레이즈 1회 소진
+    expect(g.raisesUsed).toBe(1);
+    expect(g.currentBet).toBe(50);
+    applyAction(g, 0, 'call'); // 나: 콜 → s.bet = 50 > 0
+    expect(g.seats[0].bet).toBe(50);
+    applyAction(g, 1, 'raise'); // 뒤 자리의 레이즈 → 2회 소진 완료
+    expect(g.raisesUsed).toBe(2);
+    applyAction(g, 2, 'call');
+    applyAction(g, 3, 'call');
+    expect(g.turn).toBe(0); // 내 차례가 다시 옴
+    expect(g.seats[0].bet).toBe(50); // 이번 스트리트에 이미 건 칩이 있고
+    expect(legalActions(g, 0)).not.toContain('raise'); // 레이즈는 불가 — 표기 어긋남 상태에 도달 불가
+  });
+
+  it('통제 경로: 레이즈 버튼이 뜨는 상태에서는 s.bet === 0이라 표기액과 차감액이 같다', () => {
+    const g = forceBetting(1);
+    applyAction(g, 1, 'raise'); // 50
+    applyAction(g, 2, 'call');
+    applyAction(g, 3, 'call');
+    expect(g.turn).toBe(0);
+    expect(legalActions(g, 0)).toContain('raise');
+    expect(g.seats[0].bet).toBe(0); // 불변 조건: 버튼이 뜨면 이번 스트리트에 건 칩이 없다
+    const expected = g.currentBet + BET_UNITS[0]; // 버튼 표기액 = 100
+    const before = g.seats[0].chips;
+    applyAction(g, 0, 'raise');
+    expect(before - g.seats[0].chips).toBe(expected); // 실제 차감 == 표기액
+    expect(g.currentBet).toBe(expected); // 로그 '레이즈 N칩'도 같은 값
+  });
+
+  it('통제 경로: 숏스택은 레이즈가 비활성이고, 전액 올인 레이즈도 표기액과 차감이 같다', () => {
+    const g = forceBetting(1);
+    applyAction(g, 1, 'raise'); // currentBet 50
+    applyAction(g, 2, 'call');
+    applyAction(g, 3, 'call');
+    g.seats[0].chips = 90; // toCall(50) + unit(50) = 100에 10 부족
+    expect(legalActions(g, 0)).not.toContain('raise'); // 부분 차감 경로 없음
+    expect(legalActions(g, 0)).toContain('call');
+    g.seats[0].chips = 100; // 정확히 올인 레이즈 가능
+    expect(legalActions(g, 0)).toContain('raise');
+    applyAction(g, 0, 'raise');
+    expect(g.seats[0].chips).toBe(0); // 전액 차감 == 표기액 100
+    expect(g.currentBet).toBe(100);
+  });
 });
 
 describe('칩 보존과 올인', () => {
