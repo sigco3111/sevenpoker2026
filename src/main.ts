@@ -14,14 +14,15 @@ bindCharacters(CHARACTERS);
 const app = document.getElementById('app')!;
 
 let current: { unmount(): void } | null = null;
-function show(next: { unmount(): void }) {
+// mount는 화면을 만드는 함수. 비우기보다 먼저 mount되면 방금 그린 화면이 지워지므로 반드시 비운 뒤에 호출한다.
+function show(mount: () => { unmount(): void }) {
   current?.unmount(); // 테이블은 자동 진행 타이머까지 멈춘다
   app.innerHTML = '';
-  current = next;
+  current = mount();
 }
 
 function showMenu() {
-  show(
+  show(() =>
     mountMenu(app, loadStory(localStorage), loadTournament(), {
       onFree: showFree,
       onStory: showChapterIntro,
@@ -33,13 +34,13 @@ function showMenu() {
 function showFree() {
   // 저장된 칩·판 번호를 첫 판 시작(앤티/리필 판정) 전에 복원
   const state = createGame(Math.random, loadProgress());
-  show(mountTable(app, state, { onExit: showMenu }));
+  show(() => mountTable(app, state, { onExit: showMenu }));
 }
 
 function showChapterIntro(index: number) {
   const chapter = STORY_CHAPTERS[index];
-  show(
-    mountScene(app, {
+  show(() =>
+      mountScene(app, {
       kicker: '스토리 · 리조트 클럽의 초대',
       title: chapter.title,
       illustration: chapter.illustration,
@@ -55,8 +56,8 @@ function showChapterIntro(index: number) {
 function startChapter(index: number) {
   const chapter = STORY_CHAPTERS[index];
   const state = createGame(Math.random, undefined, { opponents: chapter.opponents, startChips: chapter.startChips });
-  show(
-    mountTable(app, state, {
+  show(() =>
+      mountTable(app, state, {
       title: chapter.title,
       persist: false, // 스토리 대국 중의 칩은 저장하지 않는다(자유대국 저장 보존)
       onExit: showMenu,
@@ -74,8 +75,8 @@ function showChapterClear(index: number) {
   const progress = loadStory(localStorage);
   if (index + 1 > progress.unlocked) saveStory(localStorage, index + 1); // 다음 챕터 개방
   const last = index + 1 >= STORY_CHAPTERS.length;
-  show(
-    mountScene(app, {
+  show(() =>
+      mountScene(app, {
       kicker: '스토리 · 리조트 클럽의 초대',
       title: last ? '엔딩 · 새 챔피언' : `${chapter.title} 클리어`,
       illustration: chapter.illustration,
@@ -90,8 +91,8 @@ function showChapterClear(index: number) {
 
 function showChapterFail(index: number) {
   const chapter = STORY_CHAPTERS[index];
-  show(
-    mountScene(app, {
+  show(() =>
+      mountScene(app, {
       kicker: chapter.title,
       title: '칩이 다 떨어졌습니다',
       illustration: chapter.illustration,
@@ -106,8 +107,8 @@ function showChapterFail(index: number) {
 
 function showStageIntro(index: number) {
   const stage = TOURNAMENT_STAGES[index];
-  show(
-    mountScene(app, {
+  show(() =>
+      mountScene(app, {
       kicker: '토너먼트 · 선셋 컵',
       title: `${stage.name} · ${stage.hands}판`,
       illustration: stage.image,
@@ -128,8 +129,8 @@ function startStage(index: number) {
     ante: stage.ante,
     betUnits: stage.betUnits,
   });
-  show(
-    mountTable(app, state, {
+  show(() =>
+      mountTable(app, state, {
       title: `선셋 컵 ${stage.name} · ${stage.hands}판`,
       persist: false, // 토너먼트 대국 중의 칩은 저장하지 않는다(자유대국 저장 보존)
       onExit: showMenu,
@@ -147,8 +148,8 @@ function showStageClear(index: number) {
   const progress = loadTournament();
   const last = index + 1 >= TOURNAMENT_STAGES.length;
   saveTournament({ v: 1, stage: last ? index : index + 1, won: progress.won || last });
-  show(
-    mountScene(app, {
+  show(() =>
+      mountScene(app, {
       kicker: '토너먼트 · 선셋 컵',
       title: last ? '우승!' : `${stage.name} 통과`,
       illustration: stage.image,
@@ -163,8 +164,8 @@ function showStageClear(index: number) {
 
 function showStageFail(index: number) {
   const stage = TOURNAMENT_STAGES[index];
-  show(
-    mountScene(app, {
+  show(() =>
+      mountScene(app, {
       kicker: `토너먼트 · ${stage.name}`,
       title: '탈락',
       illustration: stage.image,
