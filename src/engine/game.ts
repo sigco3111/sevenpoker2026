@@ -49,6 +49,7 @@ export interface GameState {
   handStartChips: number[]; // 판 시작(앤티 전) 칩 — 판 종료 시 증감 표시용
   lastResult: string; // 직전 판 결과 요약 (새 판 진행 중 표시)
   bestFive: { [seat: number]: number[] }; // 각 팟 수상자의 7장 중 족보를 이룬 5장 인덱스
+  handNames: { [seat: number]: string }; // 승부 공개 판의 생존 자리별 족보 이름(다이·비공개 판은 없음)
   showdownRevealed: boolean; // 승부 공개까지 간 판이면 true (다이 종료 판은 패 비공개 유지)
 }
 
@@ -90,6 +91,7 @@ export function createGame(rng: () => number = Math.random, saved?: SavedProgres
     handStartChips: seats.map((x) => x.chips),
     lastResult: '',
     bestFive: {},
+    handNames: {},
     showdownRevealed: false,
   };
   startHand(state, rng);
@@ -148,6 +150,7 @@ export function startHand(state: GameState, rng: () => number = Math.random) {
   // 재지급 반영 후, 앤티 전 칩을 기준으로 기록
   state.handStartChips = state.seats.map((x) => x.chips);
   state.bestFive = {};
+  state.handNames = {};
   state.showdownRevealed = false;
   say(state, `— ${state.handNumber}번째 판 —`);
   for (let i = 0; i < state.seats.length; i++) {
@@ -297,6 +300,7 @@ function showdown(state: GameState) {
   }
   const v = values.get(best)!;
   state.showdownRevealed = true;
+  for (const [i, hv] of values) state.handNames[i] = CATEGORY_NAME[hv.category];
   say(state, `승부 공개: ${state.seats[best].name} ${CATEGORY_NAME[v.category]}.`);
   settlePots(state, values);
 }
