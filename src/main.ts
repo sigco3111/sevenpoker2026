@@ -132,7 +132,8 @@ function startStage(index: number) {
   });
   show(() =>
       mountTable(app, state, {
-      title: `선셋 컵 ${stage.name} · ${stage.hands}판`,
+      title: `선셋 컵 ${stage.name}`,
+      tourTotalHands: stage.hands,
       persist: false, // 토너먼트 대국 중의 칩은 저장하지 않는다(자유대국 저장 보존)
       onExit: showMenu,
       onHandOver: (st) => {
