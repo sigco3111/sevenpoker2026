@@ -78,3 +78,78 @@ export function writeProgress(store: StoreLike, snap: SavedProgress, tabId: stri
   try { store.setItem(STORE_KEYS.hands, String(snap.hands)); } catch { /* 미러 실패 무시 */ }
   return 'saved';
 }
+
+// ---- 판 종료 저장 오케스트레이션 ----
+// table.ts의 저장 흐름을 주입 가능한 형태로 분리한 것이다. Web Locks 유무에 따른
+// 두 경로(직렬화 / 보수적 차단)를 테스트에서 그대로 실행할 수 있다.
+
+export interface LocksLike {
+  request(name: string, cb: () => void): Promise<unknown>;
+}
+
+export interface StorageSourceLike {
+  addEventListener(type: 'storage', listener: (e: { key: string | null }) => void): void;
+}
+
+export interface ProgressSaverOptions {
+  store: StoreLike;
+  tabId: string;
+  // Web Locks. 없으면 미지원 경로로 동작한다.
+  locksApi?: LocksLike | null;
+  // 미지원 경로에서 다른 탭의 기록을 감지할 storage 이벤트 소스(브라우저: window).
+  events?: StorageSourceLike | null;
+  // 차단이 켜질 때 UI 갱신 등을 위한 콜백.
+  onBlocked?: () => void;
+  lockName?: string;
+}
+
+export interface ProgressSaver {
+  save(snap: SavedProgress): void;
+  readonly blocked: boolean;
+}
+
+// Web Locks 지원: 읽기-판정-쓰기를 임계 구역으로 직렬화한다.
+// 미지원: 경쟁 직접쓰기로 되돌아가지 않고, 다른 탭의 save2 기록이 storage 이벤트로
+// 보이는 순간 이후 저장을 막는 보수적 차단을 켠 뒤 저장한다. 이 경로는 완전한
+// 직렬화가 아니며 동시 첫 저장 경쟁은 남는다(README '저장' 참고).
+export function createProgressSaver(opts: ProgressSaverOptions): ProgressSaver {
+  const { store, tabId } = opts;
+  const lockName = opts.lockName ?? 'sevenpoker2026.save';
+  const locksApi =
+    opts.locksApi && typeof opts.locksApi.request === 'function' ? opts.locksApi : null;
+  let blocked = false;
+  let guardArmed = false;
+
+  const markBlocked = () => {
+    if (blocked) return;
+    blocked = true;
+    opts.onBlocked?.();
+  };
+  const armForeignWriteGuard = () => {
+    if (guardArmed || !opts.events) return;
+    guardArmed = true;
+    opts.events.addEventListener('storage', (e) => {
+      if (e.key === STORE_KEYS.save) markBlocked();
+    });
+  };
+  const doSave = (snap: SavedProgress) => {
+    try {
+      if (writeProgress(store, snap, tabId) === 'blocked-foreign') markBlocked();
+    } catch { /* 저장 실패는 무시 */ }
+  };
+
+  return {
+    get blocked() {
+      return blocked;
+    },
+    save(snap: SavedProgress) {
+      if (blocked) return;
+      if (locksApi) {
+        locksApi.request(lockName, () => doSave(snap)).catch(() => { /* 잠금 실패는 무시 */ });
+      } else {
+        armForeignWriteGuard();
+        doSave(snap);
+      }
+    },
+  };
+}
