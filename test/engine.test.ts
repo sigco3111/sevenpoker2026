@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Card, evaluate7, compareHandValue, compareUpcards, CATEGORY_NAME } from '../src/engine/cards';
+import { Card, evaluate5, evaluate7, evaluate7Best, compareHandValue, compareUpcards, CATEGORY_NAME } from '../src/engine/cards';
 import { createGame, chooseReveal, applyAction, startHand, legalActions, ANTE } from '../src/engine/game';
 import { aiChooseReveal, aiTurn, aiLine } from '../src/engine/ai';
 
@@ -384,5 +384,63 @@ describe('AI 성향·정보 위생', () => {
         expect(aiLine(seat, sit, () => 0).length).toBeGreaterThan(0);
       }
     }
+  });
+});
+
+describe('승부 공개 표시 데이터(최적 5장·칩 증감)', () => {
+  const lcg = (seed: number) => () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+
+  it('evaluate7Best는 7장 중 최적 5장의 인덱스를 돌려준다', () => {
+    const cards: Card[] = [
+      { rank: 14, suit: 's' }, { rank: 14, suit: 'h' }, { rank: 14, suit: 'd' }, { rank: 14, suit: 'c' },
+      { rank: 13, suit: 's' }, { rank: 2, suit: 'h' }, { rank: 3, suit: 'c' },
+    ]; // 포카드 A, 키커 K
+    const { value, indices } = evaluate7Best(cards);
+    expect(CATEGORY_NAME[value.category]).toBe('포카드');
+    expect(indices).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  it('승부 공개 시 bestFive는 승자의 족보를 이루는 5장을 가리킨다', () => {
+    const rng = lcg(777);
+    const g = createGame(rng);
+    let guard = 0;
+    while (guard++ < 5000) {
+      while (g.phase !== 'hand-over' && guard++ < 5000) {
+        if (g.phase === 'choose-reveal') {
+          for (let i = 0; i < 4; i++) if (!g.revealPicked[i]) chooseReveal(g, i, aiChooseReveal(g, i));
+        } else if (g.phase === 'betting') {
+          const seat = g.turn;
+          const { action } = aiTurn(g, seat, rng);
+          applyAction(g, seat, action, rng);
+        } else break;
+      }
+      if (g.resultText.includes('승부 공개')) break;
+      startHand(g, rng);
+    }
+    expect(g.resultText).toContain('승부 공개');
+    expect(g.phase).toBe('hand-over');
+    const w = g.winners[0];
+    expect(g.bestFive.length).toBe(5);
+    const five = g.bestFive.map((ci) => g.seats[w].cards[ci]);
+    expect(compareHandValue(evaluate5(five), evaluate7(g.seats[w].cards))).toBe(0);
+  });
+
+  it('칩 증감: 리필 없는 한 판에서 (현재 칩 - 판 시작 칩)의 합은 0', () => {
+    const rng = lcg(42);
+    const g = createGame(rng);
+    let guard = 0;
+    while (g.phase !== 'hand-over' && guard++ < 2000) {
+      if (g.phase === 'choose-reveal') {
+        for (let i = 0; i < 4; i++) if (!g.revealPicked[i]) chooseReveal(g, i, aiChooseReveal(g, i));
+      } else if (g.phase === 'betting') {
+        const seat = g.turn;
+        const { action } = aiTurn(g, seat, rng);
+        applyAction(g, seat, action, rng);
+      } else break;
+    }
+    expect(g.phase).toBe('hand-over');
+    expect(g.seats.every((s) => !s.refilled)).toBe(true);
+    const deltas = g.seats.map((s, i) => s.chips - g.handStartChips[i]);
+    expect(deltas.reduce((a, b) => a + b, 0)).toBe(0);
   });
 });
