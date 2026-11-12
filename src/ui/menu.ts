@@ -7,6 +7,7 @@ export interface MenuHandlers {
   onFree: () => void;
   onStory: (chapterIndex: number) => void;
   onTournament: (stageIndex: number) => void;
+  onStoryReplay?: () => void; // 전 챕터 클리어 시: 챕터/엔딩 다시 보기 장면
 }
 
 function artTile(btn: HTMLButtonElement, src: string, extraClass = '') {
@@ -80,7 +81,7 @@ export function mountMenu(root: HTMLElement, story: StoryProgress, tour: Tournam
   storyGo.className = 'go';
   storyGo.textContent = cleared || story.unlocked > 0 ? '이어하기' : '시작하기';
   storyBtn.appendChild(storyGo);
-  storyBtn.onclick = () => handlers.onStory(chapterIndex);
+  storyBtn.onclick = () => (cleared && handlers.onStoryReplay ? handlers.onStoryReplay() : handlers.onStory(chapterIndex));
   modes.appendChild(storyBtn);
 
   // 토너먼트: 현재 스테이지의 일러스트
