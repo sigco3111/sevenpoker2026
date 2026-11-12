@@ -354,6 +354,13 @@ function settlePots(state: GameState, values: Map<number, HandValue>) {
   say(state, state.resultText);
 }
 
+// 저장용 스냅샷: 판 종료 시점에만 만든다. 판 도중(null 반환 구간)에 저장하면
+// 앱을 닫았을 때 팟에 묶인 칩이 사라지는 누수가 생긴다.
+export function progressSnapshot(state: GameState): SavedProgress | null {
+  if (state.phase !== 'hand-over') return null;
+  return { chips: state.seats.map((s) => s.chips), hands: state.handNumber };
+}
+
 // UI 편의: 내 차례인지, AI 자동 진행이 필요한지
 export function needsAction(state: GameState): 'player' | 'ai' | 'none' {
   if (state.phase === 'choose-reveal') {
