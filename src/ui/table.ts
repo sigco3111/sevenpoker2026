@@ -187,6 +187,14 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
     title.innerHTML = `<span>세븐포커2026 <small>자유 대국 · ${state.handNumber}번째 판</small></span>`;
     el.appendChild(title);
 
+    // 직전 판 결과 요약 (족보 이름과 칩만, 숨김 패 내용은 포함하지 않음)
+    if (state.lastResult && state.phase !== 'hand-over') {
+      const last = document.createElement('div');
+      last.className = 'pk-last';
+      last.textContent = `직전 판: ${state.lastResult}`;
+      el.appendChild(last);
+    }
+
     // 카드 index → 렌더된 요소 (딜링 연출의 정확한 목표 지점 추적용)
     const cardEls: (HTMLElement | undefined)[][] = [[], [], [], []];
 
