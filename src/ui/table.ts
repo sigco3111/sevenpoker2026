@@ -91,6 +91,14 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
       localStorage.setItem('sevenpoker2026.chips', JSON.stringify(snap.chips));
       localStorage.setItem('sevenpoker2026.hands', String(snap.hands));
       localStorage.setItem('sevenpoker2026.owner', JSON.stringify({ tabId: TAB_ID, hands: snap.hands }));
+      // 동시 종료 경쟁 후확인: 두 탭이 거의 동시에 검사를 통과하면 마지막 쓰기가 이긴다.
+      // 쓰기 직후 소유권을 다시 읽어 내 기록이 아니면 진 탭으로 간주하고 차단한다.
+      // 저장소는 한 탭의 온전한 기록으로 유지되고, 진 탭은 안내와 함께 멈춘다.
+      const confirmRaw = localStorage.getItem('sevenpoker2026.owner');
+      const confirmOwner: SaveOwner | null = confirmRaw ? JSON.parse(confirmRaw) : null;
+      if (!confirmOwner || confirmOwner.tabId !== TAB_ID) {
+        saveBlocked = true; render();
+      }
     } catch { /* 저장 실패는 무시 */ }
   }
 
