@@ -50,6 +50,7 @@ button { font: inherit; cursor: pointer; }
 .pk-opp.pk-active { box-shadow: 0 0 0 2px var(--yellow), 0 0 18px rgba(234,179,8,.5); background: rgba(234,179,8,.12); }
 .pk-opp.pk-folded { opacity: .5; }
 .pk-winner { box-shadow: 0 0 0 2px #ffd54a, 0 0 22px rgba(255,213,74,.65) !important; }
+.pk-me.pk-active { box-shadow: 0 0 0 2px #eab308, 0 0 16px rgba(234,179,8,.45); }
 .pk-card.pk-five { border-color: #eab308; box-shadow: 0 0 0 1.5px #ffd54a, 0 0 8px rgba(255,213,74,.8); }
 .pk-delta { font-weight: 700; margin-left: 3px; }
 .pk-delta.up { color: #ffd54a; }
