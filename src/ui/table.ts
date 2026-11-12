@@ -258,7 +258,7 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
       top.appendChild(ava);
       const info = document.createElement('div');
       info.className = 'pk-opp-info';
-      info.innerHTML = `<span class="pk-name">${s.name}</span><span class="pk-chips">${s.chips.toLocaleString()}칩${deltaHtml(i, s.chips)}${s.folded ? ' · 다이' : ''}</span>`;
+      info.innerHTML = `<span class="pk-name">${s.name}</span><span class="pk-chips">${s.chips.toLocaleString()}칩${deltaHtml(i, s.chips)}${s.folded ? ' · 다이' : ''}${!s.folded && s.chips === 0 && state.phase !== 'hand-over' ? ' · 올인' : ''}</span>`;
       top.appendChild(info);
       seat.appendChild(top);
       const lineEl = document.createElement('div');
@@ -309,7 +309,7 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
       (!delegated && state.phase === 'betting' && state.turn === 0 ? ' pk-active' : '');
     const head = document.createElement('div');
     head.className = 'pk-me-head';
-    head.innerHTML = `<span class="pk-me-name">나${delegated ? ' · <span class="pk-badge">위임 중</span>' : ''}${me.folded ? ' · 다이' : ''}</span>`;
+    head.innerHTML = `<span class="pk-me-name">나${delegated ? ' · <span class="pk-badge">위임 중</span>' : ''}${me.folded ? ' · 다이' : ''}${!me.folded && me.chips === 0 && state.phase !== 'hand-over' ? ' · 올인' : ''}</span>`;
     const side = document.createElement('div');
     side.className = 'pk-me-side';
     side.innerHTML = `<span>${me.chips.toLocaleString()}칩${deltaHtml(0, me.chips)}</span>`;
@@ -419,7 +419,7 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
       if (legal.includes('raise')) {
         const raise = document.createElement('button');
         raise.className = 'pk-raise';
-        raise.textContent = `레이즈 +${unit}`;
+        raise.textContent = `레이즈 ${(state.currentBet + unit).toLocaleString()}칩`;
         raise.onclick = () => act('raise');
         bar.appendChild(raise);
       }
