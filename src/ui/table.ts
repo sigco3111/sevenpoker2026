@@ -1,7 +1,7 @@
 // 대국 화면 렌더링과 조작. 모바일 한 화면 구성(390x844) 우선.
 // 테이블 구성: 펠트 위 상대 3인 + 중앙 덱/팟, 아래 내 자리. 딜링·뒤집기 연출 포함.
 import { Card, rankLabel, SUIT_LABEL } from '../engine/cards';
-import { GameState, legalActions, needsAction, chooseReveal, applyAction, startHand, BET_UNITS } from '../engine/game';
+import { GameState, legalActions, needsAction, chooseReveal, applyAction, startHand, BET_UNITS, progressSnapshot } from '../engine/game';
 import { aiChooseReveal, aiTurn, aiLine } from '../engine/ai';
 
 const AVATARS = ['', 'avatars/avatar-1.png', 'avatars/avatar-2.png', 'avatars/avatar-3.png'];
@@ -65,13 +65,24 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
     pump();
   }
 
+  // 다른 탭이 더 앞선 진행을 저장해 두었으면 true. 이 탭의 진행은 덮어쓰지 않는다.
+  let saveBlocked = false;
+
   function saveChips() {
     // 저장은 판 종료 시점에만 한다. 판 도중(베팅이 팟에 묶인 상태) 저장하면
     // 앱을 닫았다 열었을 때 진행 중이던 팟이 사라져 전체 칩이 새는 문제가 있다.
-    if (state.phase !== 'hand-over') return;
+    const snap = progressSnapshot(state);
+    if (!snap) return;
     try {
-      localStorage.setItem('sevenpoker2026.chips', JSON.stringify(state.seats.map((s) => s.chips)));
-      localStorage.setItem('sevenpoker2026.hands', String(state.handNumber));
+      // 두 탭에서 열었을 때: 더 앞선 판 번호의 저장을 뒤처진 탭이 덮어쓰지 않게 막는다.
+      const storedHands = Number(localStorage.getItem('sevenpoker2026.hands'));
+      if (Number.isFinite(storedHands) && (snap.hands ?? 0) < storedHands) {
+        if (!saveBlocked) { saveBlocked = true; render(); }
+        return;
+      }
+      localStorage.setItem('sevenpoker2026.chips', JSON.stringify(snap.chips));
+      localStorage.setItem('sevenpoker2026.hands', String(snap.hands));
+      if (saveBlocked) { saveBlocked = false; render(); }
     } catch { /* 저장 실패는 무시 */ }
   }
 
@@ -189,6 +200,14 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
     title.className = 'pk-title';
     title.innerHTML = `<span>세븐포커2026 <small>자유 대국 · ${state.handNumber}번째 판</small></span>`;
     el.appendChild(title);
+
+    // 다른 탭이 더 앞선 진행을 저장 중이면 알림 (이 탭의 진행은 저장되지 않음)
+    if (saveBlocked) {
+      const warn = document.createElement('div');
+      warn.className = 'pk-last';
+      warn.textContent = '다른 탭에서 더 앞선 진행이 저장되어 있어, 이 탭의 진행은 저장되지 않습니다. 새로고침하면 최신 진행을 이어갑니다.';
+      el.appendChild(warn);
+    }
 
     // 직전 판 결과 요약 (족보 이름과 칩만, 숨김 패 내용은 포함하지 않음)
     if (state.lastResult && state.phase !== 'hand-over') {
