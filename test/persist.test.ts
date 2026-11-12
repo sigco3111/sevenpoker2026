@@ -231,3 +231,24 @@ describe('저장 오케스트레이션(createProgressSaver)', () => {
     expect(JSON.parse(data.get(STORE_KEYS.save)!).tabId).toBe('tabB'); // 덮어쓰기 없음
   });
 });
+
+describe('Web Locks 지원 판정(resolveLocksApi)', () => {
+  it('request 함수가 있는 객체만 지원으로 본다', async () => {
+    const { resolveLocksApi } = await import('../src/engine/persist');
+    const good = { request: () => Promise.resolve() };
+    expect(resolveLocksApi(good)).toBe(good);
+    expect(resolveLocksApi(undefined)).toBeNull();
+    expect(resolveLocksApi(null)).toBeNull();
+    expect(resolveLocksApi({})).toBeNull();
+    expect(resolveLocksApi({ request: 5 })).toBeNull();
+  });
+
+  it('형태가 다른 locks 객체는 미지원 경로(가드)로 처리한다', () => {
+    const { store } = makeStore();
+    const { events, fire } = makeEvents();
+    const saver = createProgressSaver({ store, tabId: 'tabA', locksApi: {} as never, events });
+    saver.save(snap(5));
+    fire('sevenpoker2026.save2');
+    expect(saver.blocked).toBe(true); // 가드가 켜져 있었다는 증거
+  });
+});
