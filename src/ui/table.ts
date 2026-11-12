@@ -419,7 +419,11 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
       if (legal.includes('raise')) {
         const raise = document.createElement('button');
         raise.className = 'pk-raise';
-        raise.textContent = `레이즈 ${(state.currentBet + unit).toLocaleString()}칩`;
+        // 버튼은 이번에 실제로 내는 칩(콜분 toCall + 레이즈분 unit)을 표시한다.
+        // 현재 룰에서는 레이즈 가능 상태면 항상 me.bet === 0이라 도달 베팅액(currentBet + unit)과 같지만,
+        // 규칙이 바뀌어도 버튼 금액과 실제 차감이 어긋나지 않게 지출 기준으로 계산한다.
+        // 로그의 '레이즈 N칩'은 도달 베팅액(엔진 currentBet)이라 버튼과 의미가 다를 수 있음에 유의.
+        raise.textContent = `레이즈 ${(toCall + unit).toLocaleString()}칩`;
         raise.onclick = () => act('raise');
         bar.appendChild(raise);
       }
