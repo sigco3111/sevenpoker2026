@@ -41,7 +41,7 @@ button { font: inherit; cursor: pointer; }
   position: relative;
 }
 .pk-title { display: flex; justify-content: space-between; align-items: baseline; font-weight: 800; font-size: 15px; padding: 2px 4px 8px; color: #f7ead2; }
-.pk-title small { font-weight: 600; font-size: 11px; color: #e6d3ae; margin-left: 6px; }
+.pk-title small { display: block; font-weight: 600; font-size: 11px; color: #e6d3ae; margin-left: 0; }
 
 .pk-felt {
   position: relative;
@@ -63,7 +63,9 @@ button { font: inherit; cursor: pointer; }
 .pk-opp-2 { left: 33.5%; top: 2.5%; }
 .pk-opp-3 { right: 1%; top: 24%; }
 .pk-opp-top { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-.pk-ava { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; border: 2px solid #ffe8b4; background: #e8e2d4; box-shadow: 0 3px 8px rgba(0,0,0,.35); }
+.pk-ava-wrap { position: relative; display: inline-block; width: 46px; height: 46px; }
+.pk-ava { position: absolute; inset: 0; width: 46px; height: 46px; border-radius: 50%; object-fit: cover; border: 2px solid #ffe8b4; background: transparent; box-shadow: 0 3px 8px rgba(0,0,0,.35); } /* 로딩 중에는 아래 이니셜 폴백이 보여야 하므로 배경 투명 */
+.pk-ava-fallback { display: flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 50%; border: 2px solid #ffe8b4; background: radial-gradient(circle at 35% 30%, #5b7d6e, #33473d); color: #ffe8b4; font-size: 20px; font-weight: 800; box-shadow: 0 3px 8px rgba(0,0,0,.35); }
 .pk-opp-info { display: flex; flex-direction: column; align-items: center; min-width: 0; gap: 1px; }
 .pk-name { font-size: 11px; font-weight: 900; color: #12332a; background: rgba(255,248,232,.88); border-radius: 8px; padding: 1px 8px; white-space: nowrap; }
 .pk-chips { font-size: 10px; font-weight: 800; color: var(--deepgreen); white-space: nowrap; }
@@ -150,7 +152,7 @@ button { font: inherit; cursor: pointer; }
 .pk-result { text-align: center; font-size: 13px; font-weight: 800; color: #3a2a05; background: var(--gold-soft); border: 1px solid var(--gold); border-radius: 10px; padding: 9px; margin-top: 8px; }
 .pk-log { font-size: 10px; color: #e8d9b8; padding: 6px 4px 2px; min-height: 18px; line-height: 1.35; text-align: center; }
 .pk-log div:not(:last-child) { opacity: .55; }
-.pk-exit { border: 1.5px solid rgba(255,232,180,.5); background: rgba(58,40,24,.5); color: #f0e2c4; border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 700; }
+.pk-exit { border: 1.5px solid rgba(255,232,180,.5); background: rgba(58,40,24,.5); color: #f0e2c4; border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 700; white-space: nowrap; flex-shrink: 0; align-self: flex-start; }
 
 /* ============ 메뉴 (v5: 어두운 로비 + 아트 모드 타일) ============ */
 .pk-menu { display: flex; flex-direction: column; gap: 12px; margin: -10px -10px -24px; min-height: 100vh; min-height: 100dvh; background: var(--lobby-bg); color: var(--lobby-text); padding: 0 14px 18px; }
@@ -191,3 +193,22 @@ button { font: inherit; cursor: pointer; }
 .pk-scene-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
 .pk-btn-primary { padding: 13px; border: none; border-radius: 14px; font-weight: 700; font-size: 15px; background: var(--teal); color: #fff; }
 .pk-scene .pk-btn-block { padding: 12px; border: 2px solid var(--paper); border-radius: 14px; font-weight: 600; font-size: 14px; background: #fff; color: var(--muted); margin-top: 0; }
+
+/* 상대 패 구획: 숨김(뒷면)과 공개를 분리. 넓은 화면에서는 contents로 기존 한 행 배치와 동일 */
+.pk-backs, .pk-opens { display: contents; }
+
+/* 좁은 화면(360px 이하): 뒷면은 컴팩트 스택(장수만), 공개 패는 랭크·무늬 전면 식별을 유지하면서
+   중앙 팟/스트리트 표시를 덮지 않는 폭으로 둔다 */
+@media (max-width: 360px) {
+  .pk-opp .pk-cards { flex-direction: column; align-items: flex-start; max-width: none; gap: 1px; min-height: 0; }
+  .pk-opp-3 .pk-cards { align-items: flex-end; }
+  .pk-backs { display: flex; }
+  .pk-backs .pk-card { width: 16px; height: 22px; margin-left: -10px; border-radius: 3px; }
+  .pk-backs .pk-card:first-child { margin-left: 0; }
+  .pk-opens { display: flex; flex-wrap: wrap; }
+  .pk-opens .pk-card { margin-left: -16px; }
+  .pk-opens .pk-card:first-child { margin-left: 0; }
+  .pk-ava-wrap { width: 38px; height: 38px; }
+  .pk-ava { width: 38px; height: 38px; }
+  .pk-ava-fallback { width: 38px; height: 38px; font-size: 16px; }
+}
