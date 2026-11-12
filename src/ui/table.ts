@@ -23,6 +23,7 @@ export interface TableOptions {
   onExit?: () => void; // 주어지면 '메뉴로' 버튼을 표시
   onHandOver?: (state: GameState) => void; // 판이 끝나 hand-over에 진입할 때마다 호출
   goalChips?: number; // 스토리 챕터 목표 칩. 주어지면 제목 줄에 목표까지 남은 칩을 함께 표시
+  tourTotalHands?: number; // 토너먼트 스테이지 총 판 수. 주어지면 제목 줄에 진행(n/N판)과 현재 순위를 표시
 }
 
 export function mountTable(root: HTMLElement, state: GameState, opts?: TableOptions): UI {
@@ -38,6 +39,8 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
   // 연출용 이전 상태 (자리별 카드 수, 공개 여부)
   let prevCounts = [0, 0, 0, 0];
   let prevVis: boolean[][] = [[], [], [], []];
+  // 최신 렌더의 카드 요소. 딜링 비행이 리렌더 후에도 현재 DOM을 다시 찾을 수 있게 렌더 밖에서 유지한다.
+  const cardEls: (HTMLElement | undefined)[][] = [[], [], [], []];
 
   // AI 대사(제안 초안): 자리별 최근 한 줄. 새 판이 시작되면 지운다.
   let lines: (string | null)[] = [null, null, null, null];
@@ -155,36 +158,47 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
   }
 
   // 딜링 연출: 덱에서 해당 자리의 새 카드 위치로 카드 뒷면이 날아감.
-  // 매 프레임 목표 카드의 현재 위치를 다시 읽어 따라가므로, 비행 중 스크롤·레이아웃
-  // 변화(아바타 로딩, 버튼 출현 등)가 있어도 화면 밖으로 새지 않는다.
-  // 리렌더로 목표 카드가 교체되면 새 DOM이 이미 카드를 보여 주므로 클론은 즉시 제거.
-  function animateDeals(newBySeat: { seat: number; els: HTMLElement[] }[]) {
-    const deck = el.querySelector('.pk-deck');
-    if (!deck) return;
-    for (const { els } of newBySeat) {
-      els.forEach((target, k) => {
+  // 렌더마다 DOM이 통째로 갈려 이전 캡처 요소가 끊기면 비행이 지워져
+  // '첫 배분에만 날아오는' 문제가 있었다. 덱·목표 카드를 매 프레임 다시 찾아
+  // 리렌더가 있어도 비행이 끝까지 이어지게 한다. 목표가 교체되면 새 요소를 숨기고
+  // 그 위치로 이어서 날아간다.
+  function animateDeals(newBySeat: { seat: number; cis: number[] }[]) {
+    for (const { seat, cis } of newBySeat) {
+      cis.forEach((ci, k) => {
+        const deck0 = el.querySelector('.pk-deck');
+        if (!deck0) return;
         const fly = document.createElement('div');
         fly.className = 'pk-card mini back pk-fly';
-        const dr0 = deck.getBoundingClientRect();
+        const dr0 = deck0.getBoundingClientRect();
         fly.style.left = `${dr0.left + dr0.width / 2 - 12}px`;
         fly.style.top = `${dr0.top + dr0.height / 2 - 17}px`;
         document.body.appendChild(fly);
-        target.style.visibility = 'hidden';
+        let hidden: HTMLElement | undefined = cardEls[seat][ci];
+        if (hidden) hidden.style.visibility = 'hidden';
         const startAt = performance.now() + 40 + k * 120;
         const rot = (k % 2 ? -1 : 1) * 8;
         const tick = () => {
-          if (!target.isConnected || !deck.isConnected || !fly.isConnected) { fly.remove(); return; }
+          if (!fly.isConnected) return;
+          const deck = el.querySelector('.pk-deck');
+          if (!deck || !deck.isConnected) { if (hidden) hidden.style.visibility = ''; fly.remove(); return; }
+          const target = cardEls[seat][ci];
+          if (!target) { if (hidden) hidden.style.visibility = ''; fly.remove(); return; } // 새 판 시작 등으로 카드가 사라지면 비행 종료
+          if (target !== hidden) {
+            if (hidden) hidden.style.visibility = '';
+            target.style.visibility = 'hidden';
+            hidden = target;
+          }
           const t = Math.min(1, Math.max(0, (performance.now() - startAt) / FLY_MS));
           const e = 1 - Math.pow(1 - t, 3); // easeOutCubic
           const dr = deck.getBoundingClientRect();
           const sx = dr.left + dr.width / 2;
           const sy = dr.top + dr.height / 2;
-          const tr = target.getBoundingClientRect();
+          const tr = (hidden ?? deck).getBoundingClientRect();
           fly.style.left = `${sx + (tr.left + tr.width / 2 - sx) * e - 12}px`;
           fly.style.top = `${sy + (tr.top + tr.height / 2 - sy) * e - 17}px`;
           fly.style.transform = `rotate(${rot * e}deg)`;
           if (t < 1) requestAnimationFrame(tick);
-          else { target.style.visibility = ''; fly.remove(); }
+          else { if (hidden) hidden.style.visibility = ''; fly.remove(); }
         };
         requestAnimationFrame(tick);
       });
@@ -224,7 +238,11 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
     const goal = opts?.goalChips;
     const remain = goal !== undefined ? goal - state.seats[0].chips : 0;
     const goalText = goal !== undefined ? (remain > 0 ? ` · 목표까지 ${remain}칩` : ' · 목표 달성') : '';
-    title.innerHTML = `<span>세븐포커2026 <small>${opts?.title ?? '자유 대국'} · ${state.handNumber}번째 판${goalText}</small></span>`;
+    const total = opts?.tourTotalHands;
+    // 토너먼트: 판 진행(n/N)과 칩 기준 현재 순위(동점이면 상위 공동)를 제목 줄에 표시
+    const rank = total !== undefined ? 1 + state.seats.filter((s) => s.chips > state.seats[0].chips).length : 0;
+    const handText = total !== undefined ? `${Math.min(state.handNumber, total)}/${total}판 · 현재 ${rank}위` : `${state.handNumber}번째 판`;
+    title.innerHTML = `<span>세븐포커2026 <small>${opts?.title ?? '자유 대국'} · ${handText}${goalText}</small></span>`;
     if (opts?.onExit) {
       const exit = document.createElement('button');
       exit.className = 'pk-exit';
@@ -260,7 +278,7 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
     }
 
     // 카드 index → 렌더된 요소 (딜링 연출의 정확한 목표 지점 추적용)
-    const cardEls: (HTMLElement | undefined)[][] = [[], [], [], []];
+    cardEls[0].length = 0; cardEls[1].length = 0; cardEls[2].length = 0; cardEls[3].length = 0;
 
     // 펠트 테이블
     const felt = document.createElement('div');
@@ -539,15 +557,14 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
     }
     el.appendChild(log);
 
-    // 딜링 연출: 새로 늘어난 카드들을 덱에서 날려 보냄
-    const newBySeat: { seat: number; els: HTMLElement[] }[] = [];
+    // 딜링 연출: 새로 늘어난 카드들을 덱에서 날려 보냄. 내 패(0번 자리)도 비행은 유지(사용자 요청: 날아오는 연출 유지, 플립만 제거).
+    const newBySeat: { seat: number; cis: number[] }[] = [];
     state.seats.forEach((s, i) => {
       const grown = s.cards.length - prevCounts[i];
-      // 내 패(0번 자리)에는 딜링 비행 연출을 쓰지 않는다(사용자 요청). 상대 자리는 유지.
-      if (grown > 0 && i !== 0) {
-        // 새로 받은 카드 index에 대응하는 요소를 정확히 선택 (공개/비공개 배치와 무관)
-        const els = s.cards.map((_, ci) => cardEls[i][ci]).slice(-grown).filter((e): e is HTMLElement => !!e);
-        if (els.length) newBySeat.push({ seat: i, els });
+      if (grown > 0) {
+        // 새로 받은 카드 index를 기억해 두고, 비행 중에는 매 프레임 현재 DOM 요소를 다시 찾는다(리렌더 대비)
+        const cis = s.cards.map((_, ci) => ci).slice(-grown);
+        if (cis.length) newBySeat.push({ seat: i, cis });
       }
       prevCounts[i] = s.cards.length;
       prevVis[i] = s.cards.map((_, ci) => state.phase === 'showdown' || state.phase === 'hand-over' || s.revealed[ci] === true);
