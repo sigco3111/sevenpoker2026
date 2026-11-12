@@ -677,3 +677,28 @@ describe('승부 공개 족보 라벨 데이터(handNames)', () => {
     expect(Object.keys(g.handNames).length).toBe(0);
   });
 });
+
+describe('캐릭터별 어조', () => {
+  const SITS = ['reveal','raise','bluff','fold','call','win','lose'] as const;
+  const ROLLS = [0, 0.25, 0.5, 0.75, 0.999];
+  const sample = (name: string, sit: typeof SITS[number]) =>
+    new Set(ROLLS.map((r) => aiLine(1, sit, () => r, undefined, name)));
+  it('6인 캐릭터 모두 모든 상황에서 비지 않는 대사', () => {
+    for (const name of ['소연 · 연륜','하루 · 딜러','선우 · 관찰','미로 · 계산','록키 · 직관','번개 · 승부']) {
+      for (const sit of SITS) {
+        for (const line of sample(name, sit)) expect(line.length).toBeGreaterThan(0);
+      }
+    }
+  });
+  it('같은 성향(tight)의 소연과 하루는 다른 목소리', () => {
+    for (const sit of SITS) {
+      const a = [...sample('소연 · 연륜', sit)];
+      const b = [...sample('하루 · 딜러', sit)];
+      expect(a.some((l) => !b.includes(l))).toBe(true);
+    }
+  });
+  it('알 수 없는 이름은 성향 은행으로 폴백', () => {
+    const line = aiLine(1, 'win', () => 0, 'tight', '무명');
+    expect(line.length).toBeGreaterThan(0);
+  });
+});
