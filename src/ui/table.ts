@@ -2,7 +2,7 @@
 // 테이블 구성: 펠트 위 상대 3인 + 중앙 덱/팟, 아래 내 자리. 딜링·뒤집기 연출 포함.
 import { Card, rankLabel, SUIT_LABEL } from '../engine/cards';
 import { GameState, legalActions, needsAction, chooseReveal, applyAction, startHand, BET_UNITS, progressSnapshot } from '../engine/game';
-import { readProgress, createProgressSaver, LocksLike } from '../engine/persist';
+import { readProgress, createProgressSaver, resolveLocksApi } from '../engine/persist';
 import { aiChooseReveal, aiTurn, aiLine } from '../engine/ai';
 
 const AVATARS = ['', 'avatars/avatar-1.png', 'avatars/avatar-2.png', 'avatars/avatar-3.png'];
@@ -71,10 +71,12 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
   // 다른 탭의 저장과 한 번이라도 충돌하면 saver.blocked가 켜진다. 차단된 탭은 이후
   // 판을 더 진행해도 저장하지 않는다(따라잡은 뒤 덮어쓰는 것도 막기 위해).
   // 새로고침하면 최신 진행을 이어간다.
+  const locksApi = resolveLocksApi((navigator as { locks?: unknown }).locks);
+  const locksSupported = locksApi !== null;
   const saver = createProgressSaver({
     store: localStorage,
     tabId: TAB_ID,
-    locksApi: (navigator as { locks?: LocksLike }).locks,
+    locksApi,
     events: window,
     onBlocked: () => render(),
   });
@@ -201,6 +203,15 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
     title.className = 'pk-title';
     title.innerHTML = `<span>세븐포커2026 <small>자유 대국 · ${state.handNumber}번째 판</small></span>`;
     el.appendChild(title);
+
+    // Web Locks 미지원 브라우저: 시작부터 복수 탭 저장 보호 한계를 알린다.
+    // (아래 충돌 후 경고와는 별개의 상시 안내)
+    if (!locksSupported) {
+      const note = document.createElement('div');
+      note.className = 'pk-last';
+      note.textContent = '이 브라우저에서는 여러 탭의 동시 저장을 보호하지 못합니다. 한 탭에서만 플레이해 주세요.';
+      el.appendChild(note);
+    }
 
     // 다른 탭이 더 앞선 진행을 저장 중이면 알림 (이 탭의 진행은 저장되지 않음)
     if (saver.blocked) {
