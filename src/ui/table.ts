@@ -231,7 +231,7 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
 
     // Web Locks 미지원 브라우저: 시작부터 복수 탭 저장 보호 한계를 알린다.
     // (아래 충돌 후 경고와는 별개의 상시 안내)
-    if (!locksSupported) {
+    if (persist && !locksSupported) { // 저장하지 않는 모드(스토리·토너먼트)에서는 안내 불필요
       const note = document.createElement('div');
       note.className = 'pk-last';
       note.textContent = '이 브라우저에서는 여러 탭의 동시 저장을 보호하지 못합니다. 한 탭에서만 플레이해 주세요.';
