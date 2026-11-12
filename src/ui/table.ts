@@ -30,9 +30,10 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
   let lineHand = 0;
   let prevPhase = '';
 
-  function cardEl(card: Card | null, opts: { big?: boolean; mini?: boolean; pickable?: boolean; flip?: boolean; onPick?: () => void } = {}) {
+  function cardEl(card: Card | null, opts: { big?: boolean; mini?: boolean; pickable?: boolean; flip?: boolean; flipDelay?: number; onPick?: () => void } = {}) {
     const d = document.createElement(opts.onPick ? 'button' : 'div');
     d.className = 'pk-card' + (opts.big ? ' big' : '') + (opts.mini ? ' mini' : '') + (opts.onPick ? ' pickable' : '') + (opts.flip ? ' pk-flipin' : '');
+    if (opts.flip && opts.flipDelay) d.style.animationDelay = `${opts.flipDelay}ms`;
     if (!card) {
       d.classList.add('back');
       d.setAttribute('aria-label', '뒷면 카드');
@@ -184,6 +185,9 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
     felt.className = 'pk-felt';
     el.appendChild(felt);
 
+    // 승부 공개 연출: 새로 공개되는 카드의 뒤집기를 순서대로 조금씩 늦춘다
+    let flipSeq = 0;
+
     // 상대 3인: 테이블 상단 아치 배치
     for (let i = 1; i < 4; i++) {
       const s = state.seats[i];
@@ -217,7 +221,8 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
       order.forEach(({ c, ci }) => {
         const visible = allShown || s.revealed[ci];
         const wasVisible = prevVis[i][ci] === true;
-        const ce = cardEl(visible ? c : null, { mini: true, flip: visible && !wasVisible && prevCounts[i] >= s.cards.length });
+        const flip = visible && !wasVisible && prevCounts[i] >= s.cards.length;
+        const ce = cardEl(visible ? c : null, { mini: true, flip, flipDelay: flip && state.phase !== 'betting' ? flipSeq++ * 120 : 0 });
         cardEls[i][ci] = ce;
         cards.appendChild(ce);
       });
@@ -289,7 +294,7 @@ export function mountTable(root: HTMLElement, state: GameState): UI {
         cardEls[0][ci] = ce;
         target.appendChild(ce);
       } else {
-        const ce = cardEl(c, { big: true, flip });
+        const ce = cardEl(c, { big: true, flip, flipDelay: flip && state.phase !== 'betting' ? flipSeq++ * 120 : 0 });
         cardEls[0][ci] = ce;
         target.appendChild(ce);
       }
