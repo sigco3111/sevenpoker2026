@@ -4,7 +4,8 @@ import { Card, rankLabel, SUIT_LABEL } from '../engine/cards';
 import { GameState, legalActions, needsAction, chooseReveal, applyAction, startHand, progressSnapshot } from '../engine/game';
 import { readProgress, createProgressSaver, resolveLocksApi } from '../engine/persist';
 import { aiChooseReveal, aiTurn, aiLine, seatPersonality } from '../engine/ai';
-import { loadSpeed, saveSpeed, pace } from '../settings';
+import { loadSpeed, saveSpeed, loadSound, saveSound, pace } from '../settings';
+import { sfx } from '../sound';
 
 const AVATARS = ['', 'avatars/avatar-1.png', 'avatars/avatar-2.png', 'avatars/avatar-3.png'];
 // 진행 속도 수치는 settings.ts로 이동(기본값 동일). 매 대기·비행 시작 시점에 pace()로 읽어
@@ -34,6 +35,7 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
 
   let delegated = false; // 위임 중 (확정: 직접 돌아올 때까지 계속)
   let busy = false;
+  let pendingBetSeat = -1; // AI 베팅 연출 대기 자리 (렌더 후 실행)
   let stopped = false; // unmount 후 자동 진행 중단
 
   // 연출용 이전 상태 (자리별 카드 수, 공개 여부)
@@ -79,6 +81,7 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
     applyAction(state, 0, action);
     saveChips();
     render();
+    if (action === 'call' || action === 'raise') { animateBet(0); sfx.chip(); }
     pump();
   }
 
@@ -134,11 +137,13 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
           applyAction(state, seat, action);
           if (seat >= 1) lines[seat] = line;
           acted = true;
+          if (action === 'call' || action === 'raise') { pendingBetSeat = seat; }
         }
       } else if (state.phase === 'hand-over' && delegated) {
         acted = true; // 결과를 잠시 보여 준 뒤 아래 타임아웃에서 다음 판 자동 시작
       }
       render();
+      if (pendingBetSeat >= 0) { animateBet(pendingBetSeat); sfx.chip(); pendingBetSeat = -1; }
       if (acted) {
         saveChips();
         busy = true;
@@ -162,8 +167,44 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
   // '첫 배분에만 날아오는' 문제가 있었다. 덱·목표 카드를 매 프레임 다시 찾아
   // 리렌더가 있어도 비행이 끝까지 이어지게 한다. 목표가 교체되면 새 요소를 숨기고
   // 그 위치로 이어서 날아간다.
+  // 베팅 연출: 베팅한 자리에서 팟으로 칩이 날아간다(제안 기본값).
+  // 고정 요소를 body에 띄워 레이아웃에 영향이 없게 한다.
+  function animateBet(seat: number) {
+    const fromSel = seat === 0 ? '.pk-me' : `.pk-opp-${seat}`;
+    const from = el.querySelector(fromSel);
+    const pot = el.querySelector('.pk-potbar');
+    if (!from || !pot) return;
+    const fr = from.getBoundingClientRect();
+    const pr = pot.getBoundingClientRect();
+    const sx = fr.left + fr.width / 2;
+    const sy = fr.top + fr.height / 2;
+    const tx = pr.left + pr.width / 2;
+    const ty = pr.top + pr.height / 2;
+    for (let k = 0; k < 3; k++) {
+      const chip = document.createElement('div');
+      chip.className = 'pk-chip-fly';
+      chip.style.left = `${sx - 7}px`;
+      chip.style.top = `${sy - 7}px`;
+      document.body.appendChild(chip);
+      const startAt = performance.now() + k * 70;
+      const flyMs = 320;
+      const tick = () => {
+        if (!chip.isConnected) return;
+        const t = Math.min(1, Math.max(0, (performance.now() - startAt) / flyMs));
+        const e = 1 - Math.pow(1 - t, 2);
+        chip.style.left = `${sx + (tx - sx) * e - 7}px`;
+        chip.style.top = `${sy + (ty - sy) * e - 7 - Math.sin(t * Math.PI) * 24}px`;
+        chip.style.opacity = String(t < 0.85 ? 1 : (1 - t) / 0.15);
+        if (t < 1) requestAnimationFrame(tick);
+        else chip.remove();
+      };
+      requestAnimationFrame(tick);
+    }
+  }
+
   function animateDeals(newBySeat: { seat: number; cis: number[] }[]) {
     const flyMs = pace().flyMs;
+    sfx.deal();
     for (const { seat, cis } of newBySeat) {
       cis.forEach((ci, k) => {
         const deck0 = el.querySelector('.pk-deck');
@@ -213,6 +254,7 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
     }
     if (state.phase === 'hand-over' && prevPhase !== 'hand-over') {
       opts?.onHandOver?.(state);
+      if (state.winners.includes(0)) sfx.win(); else sfx.lose();
       // 승부 결과에 맞춰 승자·패자 대사(제안 초안)
       for (let i = 1; i < 4; i++) {
         if (state.winners.includes(i)) lines[i] = aiLine(i, 'win', Math.random, seatPersonality(state, i), state.seats[i].name);
@@ -256,6 +298,19 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
         render();
       };
       title.appendChild(speedBtn);
+    }
+    {
+      const sndBtn = document.createElement('button');
+      sndBtn.className = 'pk-speed';
+      const on = loadSound() === 'on';
+      sndBtn.textContent = `소리 ${on ? '켜짐' : '꺼짐'}`;
+      sndBtn.title = '효과음을 켜고 끕니다.';
+      sndBtn.setAttribute('aria-pressed', String(on));
+      sndBtn.onclick = () => {
+        saveSound(on ? 'off' : 'on');
+        render();
+      };
+      title.appendChild(sndBtn);
     }
     if (opts?.onExit) {
       const exit = document.createElement('button');
