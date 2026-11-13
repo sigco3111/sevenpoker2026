@@ -83,7 +83,7 @@ button { font: inherit; cursor: pointer; }
 .pk-delta { font-weight: 700; margin-left: 3px; }
 .pk-delta.up { color: #7a4d00; }
 .pk-delta.down { color: #b91c1c; }
-.pk-line { min-height: 13px; font-size: 10px; line-height: 13px; color: #fffdf6; text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: rgba(16,42,35,.45); border-radius: 8px; padding: 0 7px; align-self: center; }
+.pk-line { min-height: 13px; font-size: 10px; line-height: 13px; color: #fffdf6; text-align: center; max-width: 100%; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; background: rgba(16,42,35,.45); border-radius: 8px; padding: 0 7px; align-self: center; }
 .pk-line:empty { background: transparent; padding: 0; }
 
 /* 중앙 덱 + 팟 패널 */
