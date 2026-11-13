@@ -6,7 +6,7 @@ import { mountTable, loadProgress } from './ui/table';
 import { mountMenu } from './ui/menu';
 import { mountScene } from './ui/scene';
 import { STORY_CHAPTERS, loadStory, saveStory, judgeHand } from './story';
-import { TOURNAMENT_STAGES, bindCharacters, stageSeats, stageOutcome, loadTournament, saveTournament, stageIntroLines } from './tournament';
+import { TOURNAMENT_STAGES, bindCharacters, stageSeats, stageOutcome, loadTournament, saveTournament, stageIntroLines, recordTourWin } from './tournament';
 import { CHARACTERS } from './characters';
 
 bindCharacters(CHARACTERS);
@@ -169,12 +169,14 @@ function showStageClear(index: number) {
   const progress = loadTournament();
   const last = index + 1 >= TOURNAMENT_STAGES.length;
   saveTournament({ v: 1, stage: last ? index : index + 1, won: progress.won || last });
+  // 결승 클리어는 통산 우승 기록에도 쌓는다(재도전 동기, 제안 기본값)
+  const wins = last ? recordTourWin() : null;
   show(() =>
       mountScene(app, {
       kicker: '토너먼트 · 선셋 컵',
       title: last ? '우승!' : `${stage.name} 통과`,
       illustration: stage.image,
-      lines: stage.clearLines,
+      lines: [...stage.clearLines, ...(wins ? [`통산 ${wins.wins}번째 우승입니다.`] : [])],
       actions: [
         ...(last ? [] : [{ label: '다음 스테이지', primary: true, onClick: () => showStageIntro(index + 1) }]),
         { label: '메뉴로', primary: last, onClick: showMenu },

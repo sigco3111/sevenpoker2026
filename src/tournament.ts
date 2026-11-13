@@ -110,3 +110,25 @@ export function loadTournament(): TournamentProgress {
 export function saveTournament(p: TournamentProgress): void {
   try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* 저장 실패는 진행만 휘발 */ }
 }
+
+// 우승 기록(제안 기본값): 재도전 동기용 누적 우승 횟수와 최근 우승 시각.
+// 진행 저장(tour1)과 분리해, 진행 초기화 없이 통산 기록만 쌓인다.
+const WINS_KEY = 'sevenpoker2026.tourwins1';
+export interface TourWins { v: 1; wins: number; lastWin?: string }
+
+export function loadTourWins(storage: Pick<Storage, 'getItem'> = localStorage): TourWins {
+  try {
+    const raw = storage.getItem(WINS_KEY);
+    if (!raw) return { v: 1, wins: 0 };
+    const p = JSON.parse(raw) as TourWins;
+    if (p && p.v === 1 && Number.isFinite(p.wins) && p.wins >= 0) return { v: 1, wins: Math.floor(p.wins), lastWin: typeof p.lastWin === 'string' ? p.lastWin : undefined };
+  } catch { /* 깨진 저장은 무시 */ }
+  return { v: 1, wins: 0 };
+}
+
+export function recordTourWin(storage: Pick<Storage, 'getItem'> & Pick<Storage, 'setItem'> = localStorage, now: Date = new Date()): TourWins {
+  const cur = loadTourWins(storage);
+  const next: TourWins = { v: 1, wins: cur.wins + 1, lastWin: now.toISOString() };
+  try { storage.setItem(WINS_KEY, JSON.stringify(next)); } catch { /* 저장 실패는 진행만 휘발 */ }
+  return next;
+}
