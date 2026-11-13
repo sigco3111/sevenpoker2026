@@ -57,6 +57,72 @@ const LINES: Record<Personality, Record<Situation, string[]>> = {
   },
 };
 
+// 캐릭터별 어조 은행 (제안 기본값 — 미확정 캐릭터 설정).
+// 같은 성향이라도 캐릭터마다 다른 목소리를 쓴다. 없는 상황은 성향 은행으로 폴백.
+const CHARACTER_LINES: Record<string, Partial<Record<Situation, string[]>>> = {
+  '소연': { // 최고참. 느긋하고 여유 있는 어조
+    reveal: ['자, 첫 패는 이렇게 가보지.', '이 정도는 보여줘도 되겠어.'],
+    raise: ['밀 때를 알면 늙지 않지.', '이쯤에서 슬쩍 올려볼까.', '조용히 올리는 게 제일 무섭지.'],
+    bluff: ['가끔은 연기도 필요하네.', '이 나이에 속임수 한 번쯤이야.'],
+    fold: ['오늘은 이쯤에서 물러나지.', '무리하지 않는 것도 실력이야.', '다음 판이 있으니 괜찮아.'],
+    call: ['천천히 가 보세.', '어디 한번 두고 보자.'],
+    win: ['역시 기다림이 답이야.', '허허, 운이 따라줬군.', '다 이유가 있는 선택이었다네.', '늙은이 하나 못 이기겠다고 했지?'],
+    lose: ['젊은이가 제법이군.', '이런 날도 있는 법이지.', '허허, 한 수 배웠네.'],
+  },
+  '하루': { // 딜러 출신. 정확하고 공손한 어조
+    reveal: ['이 카드로 시작하겠습니다.', '공개하겠습니다.'],
+    raise: ['계산은 끝났습니다.', '정확히 올리겠습니다.', '규정대로, 레이즈입니다.'],
+    bluff: ['딜러도 때로는 흔듭니다.', '이번 한 번만 봐주세요.'],
+    fold: ['이 핸드는 접겠습니다.', '무리하지 않겠습니다.', '정리하겠습니다.'],
+    call: ['콜하겠습니다.', '받겠습니다.'],
+    win: ['실수 없이 마무리했습니다.', '테이블 매너가 결과를 냅니다.', '정확한 플레이가 이깁니다.'],
+    lose: ['배울 점이 있네요.', '제 실수였습니다.'],
+  },
+  '선우': { // 프로 지망생. 흐름을 읽는 어조
+    reveal: ['이 카드, 눈여겨봐 주세요.', '힌트는 드렸어요.'],
+    raise: ['흐름은 이미 읽었어요.', '지금 몰아야 해요.', '이 타이밍을 기다렸어요.'],
+    bluff: ['읽히는 건 당신이에요.', '이 표정, 믿으시나요?'],
+    fold: ['여긴 제 판이 아니에요.', '흐름이 아니면 접습니다.', '이 판은 관전 모드로.'],
+    call: ['한 수 더 봅시다.', '끝까지 따라가 보죠.'],
+    win: ['프로의 길은 멀지 않네요.', '읽은 대로 흘렀어요.', '흐름은 배신하지 않아요.'],
+    lose: ['다음엔 제가 읽습니다.', '좋은 데이터예요.'],
+  },
+  '미로': { // 수학 선생. 확률·수치 어조
+    reveal: ['확률은 이쪽이에요.', '통계적으로 무난한 선택이에요.'],
+    raise: ['기댓값이 나왔어요.', '수치가 올리라고 하네요.', '승률 계산 끝났어요.'],
+    bluff: ['이 변수는 예상 못 했죠?', '확률 밖의 수도 있어요.'],
+    fold: ['승산이 없네요.', '기댓값이 마이너스예요.', '이건 숙제로 남겨둘게요.'],
+    call: ['아직 표본이 부족해요.', '데이터를 더 모아볼게요.'],
+    win: ['계산대로예요.', '확률은 거짓말하지 않아요.', '수학은 배신하지 않아요.'],
+    lose: ['분산이 컸네요.', '이건 오차 범위 밖이에요.'],
+  },
+  '록키': { // 분위기 메이커. 유쾌한 어조
+    reveal: ['짜잔, 이 카드 어때요?', '두구두구, 공개합니다!'],
+    raise: ['분위기 타면 못 멈춰요!', '자, 판을 키워봅시다!', '올라갑니다, 올라가요!'],
+    bluff: ['속여볼게요, 깜짝이야!', '이건 비밀인데, 블러프 아니에요.'],
+    fold: ['에이, 오늘은 쉬어갑니다.', '이 판은 패스, 다음에 크게!', '저 잠깐 화장실 좀.'],
+    call: ['끝까지 놀아봅시다!', '같이 가요, 같이!'],
+    win: ['파티 시작이에요!', '이맛에 포커 하지요!', '다 같이 박수!'],
+    lose: ['아이고, 김 빠졌다!', '다음 판은 진짜예요!'],
+  },
+  '번개': { // 자칭 승부사. 과격하고 자신감 넘치는 어조
+    reveal: ['봤지? 이게 승부사의 패야.', '번개는 예고 없이 친다!'],
+    raise: ['전부 걸어도 이긴다!', '물러서면 승부가 아니지!', '심장이 뛰잖아, 이거지!'],
+    bluff: ['내 눈을 봐, 떨리지?', '이 긴장감, 좋잖아?'],
+    fold: ['잠깐 숨 고르는 거야.', '이번만 봐준다.', '전략적 후퇴다, 후퇴!'],
+    call: ['도망은 안 가!', '끝까지 받아주지!'],
+    win: ['번개가 치는 건 한 번이야!', '이게 승부다!', '봤냐? 이게 나야!'],
+    lose: ['다음 판 두고 보자!', '이 맛에 승부하지... 크윽!'],
+  },
+};
+
+// 좌석 이름('소연 · 연륜' 형식)에서 캐릭터 어조 은행을 찾는다
+function characterBank(name?: string): Partial<Record<Situation, string[]>> | null {
+  if (!name) return null;
+  const key = Object.keys(CHARACTER_LINES).find((k) => name.startsWith(k));
+  return key ? CHARACTER_LINES[key] : null;
+}
+
 // 자리의 실제 성향: 상태에 지정된 캐릭터 성향을 우선하고, 없으면 자리별 기본값
 export function seatPersonality(state: GameState, seat: number): Personality {
   const p = state.seats[seat]?.personality as Personality | undefined;
@@ -64,8 +130,9 @@ export function seatPersonality(state: GameState, seat: number): Personality {
 }
 
 // 상황별 대사 한 줄 (제안 초안). seat 0(나)은 캐릭터가 없어 쓰지 않는다.
-export function aiLine(seat: number, situation: Situation, rng: () => number = Math.random, personality?: Personality): string {
-  const bank = LINES[personality ?? PERSONALITY[seat] ?? 'balanced'][situation];
+// 캐릭터 이름이 주어지면 캐릭터 어조를 우선 쓰고, 없는 상황은 성향 은행으로 폴백한다.
+export function aiLine(seat: number, situation: Situation, rng: () => number = Math.random, personality?: Personality, charName?: string): string {
+  const bank = characterBank(charName)?.[situation] ?? LINES[personality ?? PERSONALITY[seat] ?? 'balanced'][situation];
   return bank[Math.floor(rng() * bank.length)];
 }
 
@@ -143,21 +210,21 @@ export function aiTurn(state: GameState, seat: number, rng: () => number = Math.
 
   if (toCall === 0) {
     if (legal.includes('raise')) {
-      if (monster && roll < m.monsterRaise) return { action: 'raise', line: aiLine(seat, 'raise', rng) };
-      if (strong && roll < m.openRaise) return { action: 'raise', line: aiLine(seat, 'raise', rng) };
-      if (roll < m.bluffRaise) return { action: 'raise', line: aiLine(seat, 'bluff', rng) };
+      if (monster && roll < m.monsterRaise) return { action: 'raise', line: aiLine(seat, 'raise', rng, undefined, s.name) };
+      if (strong && roll < m.openRaise) return { action: 'raise', line: aiLine(seat, 'raise', rng, undefined, s.name) };
+      if (roll < m.bluffRaise) return { action: 'raise', line: aiLine(seat, 'bluff', rng, undefined, s.name) };
     }
     return { action: 'check', line: null };
   }
   // 콜 비용이 있는 경우
   if (!strong && !monster) {
-    if (legal.includes('raise') && roll < m.bluffRaise) return { action: 'raise', line: aiLine(seat, 'bluff', rng) };
-    if (roll >= m.bluffCatch) return { action: 'fold', line: aiLine(seat, 'fold', rng) };
-    return { action: legal.includes('call') ? 'call' : 'fold', line: legal.includes('call') ? aiLine(seat, 'call', rng) : aiLine(seat, 'fold', rng) };
+    if (legal.includes('raise') && roll < m.bluffRaise) return { action: 'raise', line: aiLine(seat, 'bluff', rng, undefined, s.name) };
+    if (roll >= m.bluffCatch) return { action: 'fold', line: aiLine(seat, 'fold', rng, undefined, s.name) };
+    return { action: legal.includes('call') ? 'call' : 'fold', line: legal.includes('call') ? aiLine(seat, 'call', rng, undefined, s.name) : aiLine(seat, 'fold', rng, undefined, s.name) };
   }
-  if (legal.includes('raise') && monster && roll < m.monsterRaise) return { action: 'raise', line: aiLine(seat, 'raise', rng) };
-  if (legal.includes('raise') && strong && me >= 150 && roll < m.valueRaise) return { action: 'raise', line: aiLine(seat, 'raise', rng) };
-  return { action: legal.includes('call') ? 'call' : 'fold', line: legal.includes('call') ? aiLine(seat, 'call', rng) : aiLine(seat, 'fold', rng) };
+  if (legal.includes('raise') && monster && roll < m.monsterRaise) return { action: 'raise', line: aiLine(seat, 'raise', rng, undefined, s.name) };
+  if (legal.includes('raise') && strong && me >= 150 && roll < m.valueRaise) return { action: 'raise', line: aiLine(seat, 'raise', rng, undefined, s.name) };
+  return { action: legal.includes('call') ? 'call' : 'fold', line: legal.includes('call') ? aiLine(seat, 'call', rng, undefined, s.name) : aiLine(seat, 'fold', rng, undefined, s.name) };
 }
 
 export function aiDecide(state: GameState, seat: number, rng: () => number = Math.random): Action {
