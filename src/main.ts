@@ -5,7 +5,7 @@ import { createGame } from './engine/game';
 import { mountTable, loadProgress } from './ui/table';
 import { mountMenu } from './ui/menu';
 import { mountScene } from './ui/scene';
-import { STORY_CHAPTERS, loadStory, saveStory, judgeHand } from './story';
+import { STORY_CHAPTERS, STORY_ENDING_ART, STORY_FAIL_ART, loadStory, saveStory, judgeHand } from './story';
 import { TOURNAMENT_STAGES, bindCharacters, stageSeats, stageOutcome, loadTournament, saveTournament, stageIntroLines, recordTourWin } from './tournament';
 import { CHARACTERS } from './characters';
 
@@ -79,7 +79,7 @@ function showStoryReplay() {
       mountScene(app, {
       kicker: '스토리 · 리조트 클럽의 초대',
       title: '다시 보기',
-      illustration: STORY_CHAPTERS[STORY_CHAPTERS.length - 1].illustration,
+      illustration: STORY_ENDING_ART,
       lines: ['전 챕터를 클리어했습니다.', '다시 볼 챕터나 엔딩을 고르세요.'],
       actions: [
         ...STORY_CHAPTERS.map((c, i) => ({ label: c.title, primary: false, onClick: () => showChapterIntro(i) })),
@@ -99,7 +99,7 @@ function showChapterClear(index: number) {
       mountScene(app, {
       kicker: '스토리 · 리조트 클럽의 초대',
       title: last ? '엔딩 · 새 챔피언' : `${chapter.title} 클리어`,
-      illustration: chapter.illustration,
+      illustration: chapter.clearIllustration || chapter.illustration,
       lines: chapter.clear,
       actions: [
         ...(last ? [] : [{ label: '다음 챕터', primary: true, onClick: () => showChapterIntro(index + 1) }]),
@@ -115,7 +115,7 @@ function showChapterFail(index: number) {
       mountScene(app, {
       kicker: chapter.title,
       title: '칩이 다 떨어졌습니다',
-      illustration: chapter.illustration,
+      illustration: STORY_FAIL_ART,
       lines: ['이번 테이블은 여기까지. 다음 기회를 노려보세요.'],
       actions: [
         { label: '다시 도전', primary: true, onClick: () => showChapterIntro(index) },

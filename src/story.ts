@@ -9,7 +9,8 @@ import { byId } from './characters';
 export interface StoryChapter {
   id: string;
   title: string;
-  illustration: string;
+  illustration: string; // 인트로 장면 아트
+  clearIllustration: string; // 클리어 장면 아트(장면 전환에 맞춘 별도 일러스트)
   opponents: OpponentSpec[];
   startChips: number;
   goalChips: number;
@@ -17,11 +18,16 @@ export interface StoryChapter {
   clear: string[]; // 챕터 클리어 장면
 }
 
+// 장면 전환 전용 아트: 엔딩(마지막 챕터 클리어)과 칩 소진 장면은 챕터와 무관하게 한 종씩 쓴다.
+export const STORY_ENDING_ART = 'illust/story-ending.png';
+export const STORY_FAIL_ART = 'illust/story-fail.png';
+
 export const STORY_CHAPTERS: StoryChapter[] = [
   {
     id: 'ch1',
     title: '1장 · 첫 초대',
     illustration: 'illust/story-ch1.png',
+    clearIllustration: 'illust/story-ch1-clear.png',
     opponents: [byId('haru'), byId('miro'), byId('rocky')],
     startChips: 1500,
     goalChips: 2000,
@@ -37,6 +43,7 @@ export const STORY_CHAPTERS: StoryChapter[] = [
     id: 'ch2',
     title: '2장 · 본선 테이블',
     illustration: 'illust/story-ch2.png',
+    clearIllustration: 'illust/story-ch2-clear.png',
     opponents: [byId('seonu'), byId('rocky'), byId('bolt')],
     startChips: 2000,
     goalChips: 2600,
@@ -52,6 +59,7 @@ export const STORY_CHAPTERS: StoryChapter[] = [
     id: 'ch3',
     title: '3장 · 클럽 챔피언',
     illustration: 'illust/story-ch3.png',
+    clearIllustration: STORY_ENDING_ART, // 마지막 챕터 클리어는 곧 엔딩
     opponents: [byId('soyeon'), byId('seonu'), byId('bolt')],
     startChips: 2500,
     goalChips: 3200,
