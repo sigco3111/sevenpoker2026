@@ -537,13 +537,33 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
     }
 
     if (state.phase === 'hand-over') {
-      const res = document.createElement('div');
-      res.className = 'pk-result';
-      res.textContent = state.resultText;
-      el.appendChild(res);
+      // 결과는 고정 팝업으로 보여 준다. 인라인 블록은 페이지가 길어지며
+      // 화면이 밀리는 문제가 있었다(사용자 보고). 팝업은 레이아웃을 바꾸지 않는다.
+      const overlay = document.createElement('div');
+      overlay.className = 'pk-result-pop';
+      const pop = document.createElement('div');
+      pop.className = 'pk-result-card';
+      const popTitle = document.createElement('div');
+      popTitle.className = 'pk-result-title';
+      popTitle.textContent = state.winners.includes(0)
+        ? '이겼습니다!'
+        : state.winners.length > 0
+          ? `${state.winners.map((w) => state.seats[w].name).join(', ')} 승리`
+          : '판 정리';
+      pop.appendChild(popTitle);
+      const popBody = document.createElement('div');
+      popBody.className = 'pk-result-body';
+      popBody.textContent = state.resultText;
+      pop.appendChild(popBody);
+      const start0 = state.handStartChips?.[0];
+      const d0 = start0 === undefined ? 0 : state.seats[0].chips - start0;
+      if (d0 !== 0) {
+        const dd = document.createElement('div');
+        dd.className = `pk-result-delta ${d0 > 0 ? 'up' : 'down'}`;
+        dd.textContent = `내 칩 ${d0 > 0 ? '+' : ''}${d0.toLocaleString()}`;
+        pop.appendChild(dd);
+      }
       if (!delegated) {
-        const bar = document.createElement('div');
-        bar.className = 'pk-actions';
         const next = document.createElement('button');
         next.className = 'pk-next';
         next.textContent = '다음 판';
@@ -553,10 +573,10 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
           render();
           pump();
         };
-        bar.appendChild(next);
-        band.appendChild(bar);
-        bandUsed = true;
+        pop.appendChild(next);
       }
+      overlay.appendChild(pop);
+      el.appendChild(overlay);
     }
     if (bandUsed) el.appendChild(band);
 
