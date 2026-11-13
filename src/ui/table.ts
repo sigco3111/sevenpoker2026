@@ -286,6 +286,8 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
     const rank = total !== undefined ? 1 + state.seats.filter((s) => s.chips > state.seats[0].chips).length : 0;
     const handText = total !== undefined ? `${Math.min(state.handNumber, total)}/${total}판 · 현재 ${rank}위` : `${state.handNumber}번째 판`;
     title.innerHTML = `<span>세븐포커2026 <small>${opts?.title ?? '자유 대국'} · ${handText}${goalText}</small></span>`;
+    const titleBtns = document.createElement('div');
+    titleBtns.className = 'pk-title-btns';
     {
       const speedBtn = document.createElement('button');
       speedBtn.className = 'pk-speed';
@@ -297,7 +299,7 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
         saveSpeed(fast ? 'normal' : 'fast');
         render();
       };
-      title.appendChild(speedBtn);
+      titleBtns.appendChild(speedBtn);
     }
     {
       const sndBtn = document.createElement('button');
@@ -310,15 +312,16 @@ export function mountTable(root: HTMLElement, state: GameState, opts?: TableOpti
         saveSound(on ? 'off' : 'on');
         render();
       };
-      title.appendChild(sndBtn);
+      titleBtns.appendChild(sndBtn);
     }
     if (opts?.onExit) {
       const exit = document.createElement('button');
       exit.className = 'pk-exit';
       exit.textContent = '메뉴로';
       exit.onclick = () => opts.onExit!();
-      title.appendChild(exit);
+      titleBtns.appendChild(exit);
     }
+    title.appendChild(titleBtns);
     el.appendChild(title);
 
     // Web Locks 미지원 브라우저: 시작부터 복수 탭 저장 보호 한계를 알린다.

@@ -1,6 +1,6 @@
 // 메뉴 화면: v5 로비 — 상태바 + 실제 아트 모드 타일. 모드별 구성은 제안 기본값(사용자 미확정).
 import { STORY_CHAPTERS, StoryProgress } from '../story';
-import { TOURNAMENT_STAGES, TournamentProgress } from '../tournament';
+import { TOURNAMENT_STAGES, TournamentProgress, loadTourWins } from '../tournament';
 import { loadProgress } from './table';
 
 export interface MenuHandlers {
@@ -87,11 +87,13 @@ export function mountMenu(root: HTMLElement, story: StoryProgress, tour: Tournam
   // 토너먼트: 현재 스테이지의 일러스트
   const tourBtn = document.createElement('button');
   const stageIndex = Math.min(tour.stage, TOURNAMENT_STAGES.length - 1);
-  const tourLabel = tour.won ? '우승 완료' : tour.stage === 0 ? `예선 · ${TOURNAMENT_STAGES[0].hands}판` : `${TOURNAMENT_STAGES[stageIndex].name} 진행 중`;
+  const wins = loadTourWins();
+  const winBadge = wins.wins > 0 ? ` · 우승 ${wins.wins}회` : '';
+  const tourLabel = (tour.won ? '우승 완료' : tour.stage === 0 ? `예선 · ${TOURNAMENT_STAGES[0].hands}판` : `${TOURNAMENT_STAGES[stageIndex].name} 진행 중`) + winBadge;
   // 승인 시안(v5) 기준: 토너먼트 타일은 스토리 타일과 다른 아트 사용 (자산 4종 한정으로 스테이지별 매핑)
   const TOUR_TILE_ART = ['illust/tour-qual.png', 'illust/tour-semi.png', 'illust/1-tour-final.png'];
   const tourIn = artTile(tourBtn, TOUR_TILE_ART[stageIndex]);
-  tourIn.innerHTML = `<strong>토너먼트</strong><span class="badge">${tourLabel}</span><span class="d">선셋 컵 — 예선·준결승·결승을 이겨 우승하세요.</span>`;
+  tourIn.innerHTML = `<strong>토너먼트</strong><span class="badge">${tourLabel}</span><span class="d">선셋 컵 — 예선·준결승·결승을 이겨 우승하세요.${wins.wins > 0 ? ' 다시 우승해 기록을 늘려보세요.' : ''}</span>`;
   const tourGo = document.createElement('span');
   tourGo.className = 'go';
   tourGo.textContent = '입장';
