@@ -223,3 +223,5 @@ button { font: inherit; cursor: pointer; }
 }
 .pk-speed { border: 1.5px solid rgba(255,232,180,.5); background: rgba(58,40,24,.5); color: #f0e2c4; border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 700; white-space: nowrap; flex-shrink: 0; align-self: flex-start; margin-left: auto; margin-right: 6px; }
 .pk-speed[aria-pressed="true"] { background: rgba(214,160,60,.75); color: #2a1d10; border-color: rgba(255,232,180,.9); }
+/* 베팅 칩 비행 (제안 기본값): 고정 위치라 레이아웃에 영향 없음 */
+.pk-chip-fly { position: fixed; width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ffe9b0, #d9a83c 60%, #8a6414); border: 1px solid #6b4d0e; box-shadow: 0 2px 6px rgba(0,0,0,.45); z-index: 65; pointer-events: none; }

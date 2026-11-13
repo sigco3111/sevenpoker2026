@@ -25,11 +25,33 @@ export function loadSpeed(storage: Pick<Storage, 'getItem'> = localStorage): Spe
   }
 }
 
-export function saveSpeed(speed: Speed, storage: Pick<Storage, 'setItem'> = localStorage): void {
+export function saveSpeed(speed: Speed, storage: Pick<Storage, 'getItem'> & Pick<Storage, 'setItem'> = localStorage): void {
   try {
-    storage.setItem(KEY, JSON.stringify({ v: 1, speed }));
+    storage.setItem(KEY, JSON.stringify({ v: 1, speed, sound: loadSound(storage) }));
   } catch {
     // 저장 실패는 무시(현재 세션 설정은 유지됨)
+  }
+}
+
+// 효과음 설정. 기본 켜짐(제안 기본값). 같은 설정 키의 JSON에 함께 저장한다.
+export type Sound = 'on' | 'off';
+
+export function loadSound(storage: Pick<Storage, 'getItem'> = localStorage): Sound {
+  try {
+    const raw = storage.getItem(KEY);
+    if (!raw) return 'on';
+    const parsed = JSON.parse(raw) as { sound?: unknown };
+    return parsed.sound === 'off' ? 'off' : 'on';
+  } catch {
+    return 'on';
+  }
+}
+
+export function saveSound(sound: Sound, storage: Pick<Storage, 'getItem'> & Pick<Storage, 'setItem'> = localStorage): void {
+  try {
+    storage.setItem(KEY, JSON.stringify({ v: 1, speed: loadSpeed(storage), sound }));
+  } catch {
+    // 저장 실패는 무시
   }
 }
 
