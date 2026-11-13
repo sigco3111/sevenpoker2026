@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createGame, ANTE, DEFAULT_OPPONENTS } from '../src/engine/game';
 import { seatPersonality } from '../src/engine/ai';
-import { STORY_CHAPTERS, judgeHand, loadStory, saveStory, STORY_KEY } from '../src/story';
+import { STORY_CHAPTERS, STORY_ENDING_ART, STORY_FAIL_ART, judgeHand, loadStory, saveStory, STORY_KEY } from '../src/story';
 
 const memStore = () => {
   const m = new Map<string, string>();
@@ -41,6 +41,17 @@ describe('캐릭터·챕터 구성(제안 기본값)', () => {
       expect(ch.intro.length).toBeGreaterThan(0);
       expect(ch.clear.length).toBeGreaterThan(0);
     }
+  });
+
+  it('챕터마다 인트로와 다른 클리어 장면 아트가 있고, 마지막 챕터 클리어는 엔딩 아트다', () => {
+    for (const ch of STORY_CHAPTERS) {
+      expect(ch.clearIllustration.length).toBeGreaterThan(0);
+    }
+    for (const ch of STORY_CHAPTERS.slice(0, -1)) {
+      expect(ch.clearIllustration).not.toBe(ch.illustration); // 장면 전환에 맞춘 별도 아트
+    }
+    expect(STORY_CHAPTERS[STORY_CHAPTERS.length - 1].clearIllustration).toBe(STORY_ENDING_ART);
+    expect(STORY_FAIL_ART.length).toBeGreaterThan(0);
   });
 });
 
