@@ -150,6 +150,15 @@ button { font: inherit; cursor: pointer; }
 .pk-delegated-note { text-align: center; font-size: 12px; font-weight: 700; color: #cdeee0; margin-top: 6px; }
 .pk-hint { text-align: center; font-size: 12px; font-weight: 700; color: var(--deepgreen); background: rgba(255,248,232,.9); border-radius: 10px; padding: 9px; margin-top: 8px; }
 .pk-result { text-align: center; font-size: 13px; font-weight: 800; color: #3a2a05; background: var(--gold-soft); border: 1px solid var(--gold); border-radius: 10px; padding: 9px; margin-top: 8px; }
+/* 판 결과 팝업: 레이아웃을 바꾸지 않는 고정 오버레이 (화면 밀림 방지) */
+.pk-result-pop { position: fixed; inset: 0; background: rgba(10, 22, 17, .55); display: flex; align-items: center; justify-content: center; z-index: 70; }
+.pk-result-card { width: calc(100% - 56px); max-width: 300px; background: #fffdf6; color: #3a2a05; border: 2px solid var(--gold); border-radius: 16px; padding: 16px 16px 14px; box-shadow: 0 12px 32px rgba(0, 0, 0, .5); display: flex; flex-direction: column; gap: 8px; text-align: center; }
+.pk-result-title { font-size: 16px; font-weight: 900; }
+.pk-result-body { font-size: 13px; font-weight: 700; line-height: 1.45; word-break: keep-all; }
+.pk-result-delta { font-size: 14px; font-weight: 900; }
+.pk-result-delta.up { color: #1a7a3c; }
+.pk-result-delta.down { color: #b3231a; }
+.pk-result-card .pk-next { border: none; border-radius: 10px; padding: 10px; font-size: 14px; font-weight: 900; cursor: pointer; }
 .pk-log { font-size: 10px; color: #e8d9b8; padding: 6px 4px 2px; min-height: 18px; line-height: 1.35; text-align: center; }
 .pk-log div:not(:last-child) { opacity: .55; }
 .pk-exit { border: 1.5px solid rgba(255,232,180,.5); background: rgba(58,40,24,.5); color: #f0e2c4; border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 700; white-space: nowrap; flex-shrink: 0; align-self: flex-start; }
